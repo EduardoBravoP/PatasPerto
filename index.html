@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PatasPerto — marketplace de produtos pet</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #1f2a37; background: #f4f6f8; }
+  header { background: #1f6f5c; color: #fff; padding: 14px 18px; }
+  header h1 { margin: 0; font-size: 20px; cursor: pointer; }
+  header p { margin: 3px 0 0; font-size: 12px; opacity: .9; }
+
+  .barra { display: flex; gap: 8px; padding: 12px 18px; background: #fff; border-bottom: 1px solid #e2e6ea; }
+  .barra input { flex: 1; padding: 10px 12px; font-size: 15px; border: 1px solid #c9d1da; border-radius: 8px; }
+  .barra button { padding: 10px 16px; font-size: 14px; cursor: pointer; background: #1f6f5c; color: #fff; border: none; border-radius: 8px; }
+  .barra button:hover { background: #185849; }
+
+  .filtros { display: flex; gap: 8px; padding: 12px 18px 4px; }
+  .chip { font-size: 13px; padding: 7px 14px; border-radius: 20px; cursor: pointer; background: #fff; border: 1px solid #c9d1da; color: #1f2a37; }
+  .chip.ativo { background: #1f6f5c; border-color: #1f6f5c; color: #fff; font-weight: bold; }
+
+  .info { padding: 10px 18px 4px; font-size: 13px; color: #5b6774; }
+
+  .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 12px; padding: 10px 18px 28px; }
+  .card { background: #fff; border: 1px solid #e2e6ea; border-radius: 10px; overflow: hidden; position: relative; display: flex; flex-direction: column; cursor: pointer; transition: box-shadow .15s; }
+  .card:hover { box-shadow: 0 3px 10px rgba(0,0,0,.10); }
+  .imgbox { height: 118px; background: #fff; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #f0f2f4; }
+  .imgbox svg { width: 92px; height: 92px; }
+  .badges { position: absolute; top: 8px; left: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .badge { font-size: 10px; font-weight: bold; padding: 3px 7px; border-radius: 5px; }
+  .badge.verde { background: #e3f5ec; color: #12805c; }
+  .badge.azul  { background: #e4eefb; color: #1c62c4; }
+  .corpo { padding: 8px 10px 12px; }
+  .preco { font-size: 17px; font-weight: bold; margin: 0; }
+  .titulo { font-size: 12px; color: #5b6774; margin: 3px 0 0; line-height: 1.3; min-height: 31px; }
+  .aval { font-size: 12px; color: #e6a400; margin: 5px 0 0; }
+  .aval .qtd { color: #9aa4af; }
+  .entrega { font-size: 11px; color: #3b4652; margin: 4px 0 0; }
+  .loja { font-size: 11px; color: #8a94a0; margin: 2px 0 0; }
+  .vazio { padding: 24px 18px; color: #5b6774; font-size: 14px; }
+
+  /* ---- Página do produto ---- */
+  #telaProduto { display: none; padding: 14px 18px 40px; max-width: 640px; margin: 0 auto; }
+  .voltar { background: none; border: none; color: #1f6f5c; font-size: 14px; cursor: pointer; padding: 6px 0; margin-bottom: 6px; }
+  .det-img { height: 200px; background: #fff; border: 1px solid #e2e6ea; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+  .det-img svg { width: 150px; height: 150px; }
+  .det-cat { font-size: 12px; color: #8a94a0; margin: 14px 0 0; }
+  .det-titulo { font-size: 20px; margin: 4px 0 0; }
+  .det-aval { font-size: 13px; color: #e6a400; margin: 6px 0 0; }
+  .det-aval .qtd { color: #9aa4af; }
+  .det-preco { font-size: 28px; font-weight: bold; margin: 10px 0 0; }
+  .secao { margin-top: 20px; }
+  .secao h3 { font-size: 14px; margin: 0 0 6px; }
+  .secao p { font-size: 14px; line-height: 1.5; margin: 0; color: #3b4652; }
+  .local { font-size: 14px; color: #1f2a37; margin-top: 4px; }
+
+  .opcoes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
+  .opcao { border: 1px solid #e2e6ea; border-radius: 10px; padding: 12px 14px; background: #fff; }
+  .opcao h4 { margin: 0 0 6px; font-size: 14px; }
+  .opcao .destaque { font-size: 14px; font-weight: bold; color: #12805c; margin: 0 0 4px; }
+  .opcao p { font-size: 13px; color: #3b4652; margin: 2px 0 0; line-height: 1.4; }
+
+  .acoes { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+  .acoes button { padding: 13px; font-size: 15px; border-radius: 10px; cursor: pointer; border: none; }
+  .comprar { background: #1f6f5c; color: #fff; }
+  .carrinho { background: #eaf3f0; color: #1f6f5c; border: 1px solid #cfe3db !important; }
+
+  /* ---- Abas (descrição / características / avaliações) ---- */
+  .abas { display: flex; gap: 4px; border-bottom: 1px solid #e2e6ea; margin-top: 24px; }
+  .aba { background: none; border: none; padding: 10px 12px; font-size: 14px; cursor: pointer; color: #5b6774; border-bottom: 2px solid transparent; }
+  .aba.ativa { color: #1f6f5c; border-bottom-color: #1f6f5c; font-weight: bold; }
+  .painel { padding-top: 14px; }
+  .oculto { display: none; }
+  .tabela { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tabela td { padding: 8px 10px; border-bottom: 1px solid #eef1f4; }
+  .tabela td.rot { color: #5b6774; width: 45%; }
+  .tabela tr:nth-child(odd) td { background: #f8fafb; }
+
+  .resumo-aval { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+  .resumo-aval .big { font-size: 30px; font-weight: bold; }
+  .resumo-aval .estr { color: #e6a400; font-size: 15px; }
+  .resumo-aval small { color: #8a94a0; }
+  .coment { border-bottom: 1px solid #eef1f4; padding: 12px 0; }
+  .coment .topo { display: flex; justify-content: space-between; align-items: center; }
+  .coment .autor { font-weight: bold; font-size: 13px; }
+  .coment .estrelas { color: #e6a400; font-size: 13px; }
+  .coment .txt { font-size: 13px; color: #3b4652; margin: 6px 0 0; line-height: 1.4; }
+
+  .outras { margin-top: 24px; }
+  .outras h3 { font-size: 14px; margin: 0 0 8px; }
+  .oferta-lin { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #e2e6ea; border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: #fff; }
+  .oferta-lin:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .oferta-lin .mini { width: 40px; height: 40px; }
+  .oferta-lin .ol-nome { flex: 1; font-size: 13px; }
+  .oferta-lin .ol-preco { font-size: 15px; font-weight: bold; }
+  .oferta-lin small { color: #8a94a0; font-size: 11px; display: block; }
+
+  /* ---- Navegação de seções ---- */
+  nav.secoes { display: flex; background: #fff; border-bottom: 1px solid #e2e6ea; }
+  nav.secoes button { flex: 1; padding: 12px; font-size: 14px; background: none; border: none; cursor: pointer; color: #5b6774; border-bottom: 2px solid transparent; }
+  nav.secoes button.ativo { color: #1f6f5c; font-weight: bold; border-bottom-color: #1f6f5c; }
+
+  /* ---- Emergência ---- */
+  #telaEmergencia { display: none; padding: 16px 18px 40px; max-width: 640px; margin: 0 auto; }
+  .aviso { background: #fff4e5; border: 1px solid #f6d9a8; color: #8a5a12; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.45; }
+  .emg-h3 { font-size: 15px; margin: 22px 0 10px; }
+  .sos-card { background: #fdeeee; border: 1px solid #f3c9c9; border-radius: 12px; padding: 16px; margin-top: 16px; }
+  .sos-card h3 { margin: 0 0 6px; color: #b23636; font-size: 16px; }
+  .sos-card > p { margin: 0 0 12px; font-size: 13px; color: #7a3b3b; }
+  .btn-sos { width: 100%; padding: 14px; background: #d64545; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; }
+  .btn-sos:hover { background: #c23a3a; }
+  .btn-sec { width: 100%; padding: 12px; background: #fff; color: #1f6f5c; border: 1px solid #cfe3db; border-radius: 10px; font-size: 14px; cursor: pointer; margin-top: 8px; }
+  .sit-lista { display: flex; flex-direction: column; gap: 8px; }
+  .sit-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #fff; border: 1px solid #e2e6ea; border-radius: 10px; cursor: pointer; }
+  .sit-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .sit-item .ic { font-size: 22px; }
+  .sit-item .nm { font-size: 14px; font-weight: bold; }
+  .passos { padding: 0; margin: 14px 0 0; list-style: none; counter-reset: step; }
+  .passos li { position: relative; padding: 10px 0 10px 34px; border-bottom: 1px solid #eef1f4; font-size: 14px; color: #3b4652; line-height: 1.45; }
+  .passos li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 10px; width: 22px; height: 22px; background: #1f6f5c; color: #fff; border-radius: 50%; text-align: center; font-size: 12px; line-height: 22px; font-weight: bold; }
+  .alerta-passo { background: #fff4e5; border-left: 3px solid #e0a53c; padding: 8px 10px; font-size: 13px; color: #8a5a12; margin-top: 14px; border-radius: 4px; line-height: 1.4; }
+  .rotulo { font-size: 13px; font-weight: bold; margin-top: 14px; display: block; }
+  .campo { width: 100%; padding: 10px 12px; font-size: 14px; border: 1px solid #c9d1da; border-radius: 8px; margin-top: 6px; font-family: inherit; }
+  .clinica { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #fff; border: 1px solid #e2e6ea; border-radius: 10px; margin-bottom: 8px; }
+  .clinica .cl-info { flex: 1; }
+  .clinica .cl-nome { font-size: 14px; font-weight: bold; }
+  .clinica small { color: #8a94a0; font-size: 12px; display: block; }
+  .tag24 { font-size: 10px; font-weight: bold; background: #e3f5ec; color: #12805c; padding: 3px 7px; border-radius: 5px; }
+  .confirma { text-align: center; padding: 18px 0 6px; }
+  .confirma .check { font-size: 44px; }
+  .confirma h3 { margin: 8px 0 6px; }
+
+  /* ---- Responsividade ---- */
+  @media (min-width: 900px) { #telaLista { max-width: 1120px; margin: 0 auto; } }
+  @media (max-width: 560px) {
+    .opcoes { grid-template-columns: 1fr; }
+    .det-img { height: 170px; }
+    .det-img svg { width: 120px; height: 120px; }
+  }
+  @media (max-width: 400px) {
+    header { padding: 12px 14px; }
+    .grade { grid-template-columns: repeat(2, 1fr); padding: 10px 12px 28px; gap: 10px; }
+    .barra, .filtros, .info { padding-left: 12px; padding-right: 12px; }
+    .imgbox svg { width: 74px; height: 74px; }
+    .titulo { min-height: 0; }
+    #telaProduto { padding: 14px 12px 40px; }
+    .det-titulo { font-size: 18px; }
+    .det-preco { font-size: 24px; }
+    .abas { overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="logo">🐾 PatasPerto</h1>
+  <p>Produtos para o seu pet nas lojas mais perto de você</p>
+</header>
+
+<nav class="secoes">
+  <button id="navLoja" class="ativo">🛒 Loja</button>
+  <button id="navEmg">🚑 Emergência</button>
+</nav>
+
+<div id="telaLista">
+  <div class="barra">
+    <input id="campoBusca" type="text" placeholder="Buscar produto (ex.: ração, bolinha, caminha)" autocomplete="off">
+    <button id="botaoBusca">Buscar</button>
+  </div>
+  <div class="filtros">
+    <button class="chip ativo" data-ord="preco">↓ Menor preço</button>
+    <button class="chip" data-ord="perto">Mais perto</button>
+  </div>
+  <p class="info" id="info"></p>
+  <div class="grade" id="grade"></div>
+</div>
+
+<div id="telaProduto"></div>
+<div id="telaEmergencia"></div>
+
+<script>
+/* ============================================================
+   PatasPerto — marketplace
+   Classes de domínio + busca + ordenação + página do produto
+   (localização, retirada x frete, descrição, características e
+    avaliações em abas). Dados/imagens fictícios.
+   ============================================================ */
+
+const ILUSTRACOES = {
+  racaoCao: '<svg viewBox="0 0 100 100"><rect x="28" y="26" width="44" height="58" rx="6" fill="#D98A3D"/><path d="M28 26 L40 19 L60 19 L72 26 Z" fill="#B5702B"/><circle cx="50" cy="56" r="6" fill="#5A3A1A"/><circle cx="42" cy="48" r="3" fill="#5A3A1A"/><circle cx="50" cy="46" r="3" fill="#5A3A1A"/><circle cx="58" cy="48" r="3" fill="#5A3A1A"/></svg>',
+  racaoGato: '<svg viewBox="0 0 100 100"><rect x="28" y="26" width="44" height="58" rx="6" fill="#3E8FC0"/><path d="M28 26 L40 19 L60 19 L72 26 Z" fill="#2E6E96"/><ellipse cx="47" cy="56" rx="12" ry="7" fill="#fff"/><path d="M58 56 L67 49 L67 63 Z" fill="#fff"/><circle cx="42" cy="54" r="1.6" fill="#2E6E96"/></svg>',
+  bola: '<svg viewBox="0 0 100 100"><circle cx="50" cy="52" r="26" fill="#E24B4A"/><line x1="24" y1="52" x2="76" y2="52" stroke="#B23636" stroke-width="3"/><ellipse cx="50" cy="52" rx="10" ry="26" fill="none" stroke="#B23636" stroke-width="3"/><circle cx="42" cy="44" r="6" fill="#fff" opacity="0.55"/></svg>',
+  caminha: '<svg viewBox="0 0 100 100"><ellipse cx="50" cy="74" rx="32" ry="11" fill="#B98E57"/><ellipse cx="50" cy="70" rx="26" ry="8" fill="#E7D3A8"/><path d="M30 68 q20 -17 40 0 q-20 7 -40 0 Z" fill="#8A7A63"/><circle cx="35" cy="63" r="6" fill="#8A7A63"/><path d="M31 59 l1 -5 4 3 Z" fill="#8A7A63"/><path d="M39 59 l-1 -5 -4 3 Z" fill="#8A7A63"/></svg>',
+  areia: '<svg viewBox="0 0 100 100"><rect x="30" y="26" width="40" height="56" rx="6" fill="#8FB3C7"/><path d="M30 26 L41 20 L59 20 L70 26 Z" fill="#6E93A8"/><g fill="#4F6B7D"><circle cx="42" cy="52" r="2"/><circle cx="50" cy="48" r="2"/><circle cx="58" cy="54" r="2"/><circle cx="46" cy="60" r="2"/><circle cx="55" cy="62" r="2"/><circle cx="50" cy="56" r="2"/></g></svg>',
+  petisco: '<svg viewBox="0 0 100 100"><g transform="rotate(-28 50 50)" fill="#E8C98A" stroke="#C9A461" stroke-width="2"><circle cx="32" cy="45" r="7"/><circle cx="32" cy="57" r="7"/><circle cx="68" cy="45" r="7"/><circle cx="68" cy="57" r="7"/><rect x="32" y="44" width="36" height="14" rx="4"/></g></svg>'
+};
+
+class Loja {
+  constructor(id, nome, distanciaKm, nota, qtdAvaliacoes, endereco) {
+    this.id = id; this.nome = nome; this.distanciaKm = distanciaKm;
+    this.nota = nota; this.qtdAvaliacoes = qtdAvaliacoes; this.endereco = endereco;
+  }
+}
+class Produto {
+  constructor(id, nome, categoria, img, descricao, caracteristicas, comentarios) {
+    this.id = id; this.nome = nome; this.categoria = categoria; this.img = img;
+    this.descricao = descricao;
+    this.caracteristicas = caracteristicas; // [[rótulo, valor], ...]
+    this.comentarios = comentarios;         // [{autor, nota, texto}, ...]
+  }
+  mediaAvaliacoes() {
+    if (this.comentarios.length === 0) return 0;
+    return this.comentarios.reduce((s,c) => s + c.nota, 0) / this.comentarios.length;
+  }
+}
+class Oferta {
+  constructor(produto, loja, preco, entrega) {
+    this.produto = produto; this.loja = loja; this.preco = preco; this.entrega = entrega;
+  }
+  frete() {
+    if (this.preco >= 100) return 0;
+    return Math.round((8.90 + this.loja.distanciaKm * 4) * 100) / 100;
+  }
+  prazoEntrega() {
+    const d = this.loja.distanciaKm;
+    if (d < 1) return "1 dia útil";
+    if (d < 2) return "2 dias úteis";
+    return "3 dias úteis";
+  }
+  tempoRetirada() { return Math.max(2, Math.round(this.loja.distanciaKm * 4)) + " min de carro"; }
+}
+class Catalogo {
+  constructor() { this.ofertas = []; }
+  adicionar(o) { this.ofertas.push(o); }
+  buscar(termo) {
+    const t = this._normalizar(termo);
+    if (t === "") return this.ofertas.slice();
+    return this.ofertas.filter(o => this._normalizar(o.produto.nome).includes(t));
+  }
+  ofertasDoProduto(produto) { return this.ofertas.filter(o => o.produto.id === produto.id); }
+  _normalizar(txt) { return txt.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim(); }
+}
+
+/* ---- Base fictícia ---- */
+const lojas = [
+  new Loja(1, "Petshop do Zé",   0.8, 4.8, 120, "Rua das Acácias, 120 · Centro"),
+  new Loja(2, "Agropet Sumaré",  0.4, 4.6, 83,  "Av. Brasil, 455 · Jd. Bela Vista"),
+  new Loja(3, "Cantinho Animal", 1.2, 4.9, 210, "Rua Ipê, 78 · Vila Nova"),
+  new Loja(4, "Mundo Pet",       2.1, 4.7, 64,  "Av. da Saudade, 1020 · Jd. Europa"),
+  new Loja(5, "Casa dos Bichos", 1.7, 4.5, 96,  "Rua São João, 33 · Centro"),
+];
+
+const produtos = [
+  new Produto(1, "Ração Golden Fórmula Cães 15 kg", "Cães", "racaoCao",
+    "Ração super premium para cães adultos de todas as raças. Fórmula com proteínas de alta qualidade que ajudam na saúde da pele e da pelagem. Pacote de 15 kg.",
+    [["Marca","Golden"],["Indicado para","Cães adultos"],["Peso","15 kg"],["Sabor","Frango e carne"],["Linha","Super premium"]],
+    [{autor:"Ana",nota:5,texto:"Meu cachorro adorou, o pelo ficou mais brilhante."},
+     {autor:"Marcos",nota:4,texto:"Boa ração pelo preço. Entrega rápida."},
+     {autor:"Júlia",nota:5,texto:"Sempre compro, ótima qualidade."}]),
+  new Produto(2, "Ração Whiskas Gatos 10 kg", "Gatos", "racaoGato",
+    "Ração para gatos adultos, rica em nutrientes essenciais para a saúde felina. Sabor carne. Embalagem de 10 kg.",
+    [["Marca","Whiskas"],["Indicado para","Gatos adultos"],["Peso","10 kg"],["Sabor","Carne"]],
+    [{autor:"Paula",nota:4,texto:"Minha gata comeu bem, mas o saco veio um pouco amassado."},
+     {autor:"Rafael",nota:5,texto:"Preço justo e ela adora."}]),
+  new Produto(3, "Bolinha Maciça para Cães", "Brinquedos", "bola",
+    "Bolinha maciça e resistente, ideal para brincadeiras de buscar e morder. Material atóxico e durável.",
+    [["Material","Borracha atóxica"],["Tamanho","Médio"],["Indicado para","Cães de porte pequeno e médio"]],
+    [{autor:"Bruno",nota:5,texto:"Resistente, meu dog não conseguiu destruir."},
+     {autor:"Carla",nota:4,texto:"Boa, mas um pouco menor do que eu imaginava."}]),
+  new Produto(4, "Caminha para Gato Aconchego", "Conforto", "caminha",
+    "Caminha macia e aconchegante para gatos, com forro confortável e base antiderrapante. Fácil de lavar.",
+    [["Material","Poliéster"],["Tamanho","Grande"],["É lavável","Sim"],["À prova d'água","Não"],["Indicado para","Gatos e cães de porte médio"]],
+    [{autor:"Fernanda",nota:5,texto:"Super macia, meu gato dorme o dia todo nela."},
+     {autor:"Diego",nota:4,texto:"Confortável e fácil de lavar."},
+     {autor:"Lu",nota:5,texto:"Ótimo custo-benefício."}]),
+  new Produto(5, "Areia Sanitária para Gatos 4 kg", "Gatos", "areia",
+    "Areia sanitária higiênica com alto poder de absorção e controle de odores. Pacote de 4 kg.",
+    [["Tipo","Grão fino"],["Peso","4 kg"],["Controle de odor","Sim"]],
+    [{autor:"Sandra",nota:4,texto:"Absorve bem, mas rende um pouco menos que eu esperava."},
+     {autor:"Tiago",nota:5,texto:"Praticamente sem cheiro, recomendo."}]),
+  new Produto(6, "Petisco Bifinho para Cães", "Petiscos", "petisco",
+    "Petisco em tiras macias, ótimo para o dia a dia e para o treinamento. Sabor carne.",
+    [["Marca","Bifinho"],["Sabor","Carne"],["Peso","60 g"],["Indicado para","Todas as raças"]],
+    [{autor:"Renata",nota:5,texto:"Meu cão faz tudo por esse petisco."},
+     {autor:"Igor",nota:4,texto:"Bom para usar no treino."}]),
+];
+
+const catalogo = new Catalogo();
+const p = id => produtos.find(x => x.id === id);
+const l = id => lojas.find(x => x.id === id);
+const dados = [
+  [1,1,189.90,"Retira hoje"],[1,2,194.00,"Retira hoje"],[1,3,199.90,"Chega quarta"],[1,4,205.00,"Chega quinta"],
+  [2,2,128.90,"Retira hoje"],[2,1,132.00,"Retira hoje"],[2,5,135.50,"Chega quarta"],
+  [3,1,19.90,"Retira hoje"],[3,3,17.50,"Chega quarta"],[3,5,18.90,"Retira hoje"],
+  [4,4,89.90,"Chega quinta"],[4,3,94.90,"Chega quarta"],[4,5,99.00,"Retira hoje"],
+  [5,2,24.90,"Retira hoje"],[5,3,22.50,"Chega quarta"],[5,1,26.00,"Retira hoje"],
+  [6,2,9.90,"Retira hoje"],[6,3,8.50,"Chega quarta"],[6,4,10.90,"Chega quinta"],
+];
+dados.forEach(([pid,lid,preco,ent]) => catalogo.adicionar(new Oferta(p(pid), l(lid), preco, ent)));
+
+/* ---- Utilidades ---- */
+const grade = document.getElementById("grade");
+const info  = document.getElementById("info");
+const campo = document.getElementById("campoBusca");
+const telaLista = document.getElementById("telaLista");
+const telaProduto = document.getElementById("telaProduto");
+let termoAtual = "";
+let ordemAtual = "preco";
+
+const fmt = v => "R$ " + v.toFixed(2).replace(".", ",");
+const num1 = v => v.toFixed(1).replace(".", ",");
+const iconeEntrega = e => e.startsWith("Retira") ? "🏪" : "🚚";
+const estrelas = n => "★".repeat(n) + "☆".repeat(5 - n);
+
+/* ---- Lista / grade ---- */
+function render() {
+  let res = catalogo.buscar(termoAtual);
+  if (ordemAtual === "preco") res.sort((a,b) => a.preco - b.preco);
+  else res.sort((a,b) => a.loja.distanciaKm - b.loja.distanciaKm);
+
+  let menor = null, perto = null;
+  res.forEach(o => {
+    if (!menor || o.preco < menor.preco) menor = o;
+    if (!perto || o.loja.distanciaKm < perto.loja.distanciaKm) perto = o;
+  });
+
+  grade.innerHTML = "";
+  if (res.length === 0) {
+    info.textContent = "";
+    grade.innerHTML = '<p class="vazio">Nenhum produto encontrado para “' + termoAtual + '”. Tente “ração”, “bolinha” ou “caminha”.</p>';
+    return;
+  }
+  info.textContent = res.length + " ofertas perto de você" + (termoAtual.trim() ? " para “" + termoAtual + "”" : "");
+
+  res.forEach(o => {
+    let badges = "";
+    if (o === menor) badges += '<span class="badge verde">Menor preço</span>';
+    if (o === perto) badges += '<span class="badge azul">Mais perto</span>';
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML =
+      (badges ? '<div class="badges">' + badges + '</div>' : '') +
+      '<div class="imgbox">' + ILUSTRACOES[o.produto.img] + '</div>' +
+      '<div class="corpo">' +
+        '<p class="preco">' + fmt(o.preco) + '</p>' +
+        '<p class="titulo">' + o.produto.nome + '</p>' +
+        '<p class="aval">★ ' + num1(o.loja.nota) + ' <span class="qtd">(' + o.loja.qtdAvaliacoes + ')</span></p>' +
+        '<p class="entrega">' + iconeEntrega(o.entrega) + ' ' + o.entrega + ' · ' + num1(o.loja.distanciaKm) + ' km</p>' +
+        '<p class="loja">' + o.loja.nome + '</p>' +
+      '</div>';
+    card.addEventListener("click", () => abrirProduto(o));
+    grade.appendChild(card);
+  });
+}
+
+/* ---- Página do produto ---- */
+function abrirProduto(o) {
+  const prod = o.produto;
+  const frete = o.frete();
+  const freteTxt = frete === 0 ? "Grátis" : fmt(frete);
+  const media = prod.mediaAvaliacoes();
+
+  // aba Características
+  const tabelaCarac = '<table class="tabela">' +
+    prod.caracteristicas.map(c => '<tr><td class="rot">' + c[0] + '</td><td>' + c[1] + '</td></tr>').join('') +
+    '</table>';
+
+  // aba Avaliações
+  const listaComent = prod.comentarios.map(c =>
+    '<div class="coment"><div class="topo"><span class="autor">' + c.autor + '</span>' +
+    '<span class="estrelas">' + estrelas(c.nota) + '</span></div>' +
+    '<p class="txt">' + c.texto + '</p></div>').join('');
+  const painelAval =
+    '<div class="resumo-aval"><span class="big">' + num1(media) + '</span>' +
+    '<span><span class="estr">' + estrelas(Math.round(media)) + '</span><br>' +
+    '<small>' + prod.comentarios.length + ' avaliações</small></span></div>' + listaComent;
+
+  // outras lojas
+  let outras = catalogo.ofertasDoProduto(prod).filter(x => x !== o).sort((a,b) => a.preco - b.preco);
+  let outrasHtml = "";
+  if (outras.length > 0) {
+    outrasHtml = '<div class="outras"><h3>Outras lojas com este produto</h3>' +
+      outras.map((x,i) =>
+        '<div class="oferta-lin" data-idx="' + i + '">' +
+          '<div class="mini">' + ILUSTRACOES[x.produto.img] + '</div>' +
+          '<div class="ol-nome">' + x.loja.nome + '<small>📍 ' + num1(x.loja.distanciaKm) + ' km · ' + x.loja.endereco + '</small></div>' +
+          '<div class="ol-preco">' + fmt(x.preco) + '</div>' +
+        '</div>').join("") + '</div>';
+  }
+
+  telaProduto.innerHTML =
+    '<button class="voltar" id="btVoltar">← Voltar aos resultados</button>' +
+    '<div class="det-img">' + ILUSTRACOES[prod.img] + '</div>' +
+    '<p class="det-cat">' + prod.categoria + '</p>' +
+    '<h2 class="det-titulo">' + prod.nome + '</h2>' +
+    '<p class="det-aval">★ ' + num1(media) + ' <span class="qtd">(' + prod.comentarios.length + ' avaliações)</span></p>' +
+    '<p class="det-preco">' + fmt(o.preco) + '</p>' +
+
+    '<div class="secao"><h3>Vendido por</h3>' +
+      '<p><b>' + o.loja.nome + '</b> · ★ ' + num1(o.loja.nota) + '</p>' +
+      '<p class="local">📍 ' + o.loja.endereco + ' — a ' + num1(o.loja.distanciaKm) + ' km de você</p>' +
+    '</div>' +
+
+    '<div class="opcoes">' +
+      '<div class="opcao"><h4>🏪 Retirar na loja</h4>' +
+        '<p class="destaque">Retire hoje</p>' +
+        '<p>' + o.loja.endereco + '</p>' +
+        '<p>A ' + num1(o.loja.distanciaKm) + ' km (~' + o.tempoRetirada() + ')</p>' +
+        '<p>Sem custo de entrega</p></div>' +
+      '<div class="opcao"><h4>🚚 Receber em casa</h4>' +
+        '<p class="destaque">Chega em ' + o.prazoEntrega() + '</p>' +
+        '<p>Frete: ' + freteTxt + '</p>' +
+        (frete === 0 ? '<p>Frete grátis acima de R$ 100</p>' : '<p>Calculado pela distância da loja</p>') +
+      '</div>' +
+    '</div>' +
+
+    '<div class="acoes">' +
+      '<button class="comprar" id="btComprar">Comprar agora</button>' +
+      '<button class="carrinho" id="btCarrinho">Adicionar ao carrinho</button>' +
+    '</div>' +
+
+    '<div class="abas">' +
+      '<button class="aba ativa" data-aba="desc">Descrição</button>' +
+      '<button class="aba" data-aba="carac">Características</button>' +
+      '<button class="aba" data-aba="aval">Avaliações (' + prod.comentarios.length + ')</button>' +
+    '</div>' +
+    '<div class="painel" id="painel-desc"><p class="secao" style="margin:0">' + prod.descricao + '</p></div>' +
+    '<div class="painel oculto" id="painel-carac">' + tabelaCarac + '</div>' +
+    '<div class="painel oculto" id="painel-aval">' + painelAval + '</div>' +
+
+    outrasHtml;
+
+  document.getElementById("btVoltar").addEventListener("click", voltar);
+  document.getElementById("btComprar").addEventListener("click", () => alert("Compra simulada — checkout fora do escopo desta versão."));
+  document.getElementById("btCarrinho").addEventListener("click", () => alert("Item adicionado (simulação)."));
+  telaProduto.querySelectorAll(".oferta-lin").forEach((el,i) => el.addEventListener("click", () => abrirProduto(outras[i])));
+
+  // troca de abas
+  telaProduto.querySelectorAll(".aba").forEach(b => {
+    b.addEventListener("click", () => {
+      telaProduto.querySelectorAll(".aba").forEach(x => x.classList.remove("ativa"));
+      telaProduto.querySelectorAll(".painel").forEach(x => x.classList.add("oculto"));
+      b.classList.add("ativa");
+      telaProduto.querySelector("#painel-" + b.dataset.aba).classList.remove("oculto");
+    });
+  });
+
+  telaLista.style.display = "none";
+  telaProduto.style.display = "block";
+  window.scrollTo(0, 0);
+}
+
+function voltar() {
+  telaProduto.style.display = "none";
+  telaLista.style.display = "block";
+  window.scrollTo(0, 0);
+}
+
+/* ---- Eventos ---- */
+function buscar() { termoAtual = campo.value; render(); }
+document.getElementById("botaoBusca").addEventListener("click", buscar);
+campo.addEventListener("keydown", e => { if (e.key === "Enter") buscar(); });
+document.getElementById("logo").addEventListener("click", voltar);
+document.querySelectorAll(".chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".chip").forEach(c => c.classList.remove("ativo"));
+    chip.classList.add("ativo");
+    ordemAtual = chip.dataset.ord;
+    render();
+  });
+});
+
+/* ================= EMERGÊNCIA ================= */
+class Clinica {
+  constructor(id, nome, endereco, distanciaKm, telefone, aberto24h) {
+    this.id = id; this.nome = nome; this.endereco = endereco;
+    this.distanciaKm = distanciaKm; this.telefone = telefone; this.aberto24h = aberto24h;
+  }
+}
+// Veterinário da família (clínica interligada ao app — também vende no marketplace)
+const vetFamilia = { nome: "Dra. Marina Alves", clinica: "Clínica VidaPet", telefone: "(19) 99999-0001", distanciaKm: 0.6 };
+const clinicas = [
+  new Clinica(1, "Clínica VidaPet", "Rua das Flores, 200 · Centro", 0.6, "(19) 99999-0001", true),
+  new Clinica(2, "Clínica AmorPet", "Av. Brasil, 455 · Jd. Bela Vista", 0.9, "(19) 99999-0002", false),
+  new Clinica(3, "PetCare Emergências", "Av. Central, 890 · Jd. Europa", 1.5, "(19) 99999-0003", true),
+  new Clinica(4, "Hosp. Vet. Bicho Feliz", "Rua Verde, 45 · Vila Nova", 2.3, "(19) 99999-0004", true),
+];
+const primeirosSocorros = [
+  { id:"engasgo", icone:"😮‍💨", titulo:"Engasgo",
+    passos:["Mantenha a calma e contenha o animal com cuidado para não se machucar.",
+            "Abra a boca e verifique se o objeto está visível; retire apenas se conseguir alcançá-lo sem empurrar.",
+            "Em cães pequenos, segure-o de cabeça para baixo por instantes; em cães grandes, eleve as patas traseiras.",
+            "Se não resolver em segundos, leve imediatamente ao veterinário."],
+    alerta:"Não coloque a mão fundo na garganta às cegas — você pode empurrar o objeto ainda mais." },
+  { id:"sangramento", icone:"🩹", titulo:"Sangramento / corte",
+    passos:["Pressione o local com um pano limpo ou gaze por alguns minutos.",
+            "Se encharcar, não retire o pano: coloque outro por cima e continue pressionando.",
+            "Mantenha o animal o mais calmo e imóvel possível.",
+            "Procure atendimento se o sangramento for intenso ou não parar."],
+    alerta:"" },
+  { id:"toxico", icone:"☠️", titulo:"Ingestão de algo tóxico",
+    passos:["Afaste o animal da substância e tente identificar o que foi ingerido.",
+            "NÃO induza o vômito sem orientação do veterinário.",
+            "Guarde a embalagem ou o rótulo do produto para mostrar ao profissional.",
+            "Ligue para o veterinário ou vá à clínica imediatamente."],
+    alerta:"Alguns produtos causam mais dano se vomitados — só induza o vômito se o veterinário orientar." },
+  { id:"convulsao", icone:"⚡", titulo:"Convulsão",
+    passos:["Afaste móveis e objetos ao redor para o animal não se machucar.",
+            "Não coloque a mão na boca dele.",
+            "Observe e anote quanto tempo dura a crise.",
+            "Depois da crise, deixe-o em ambiente calmo e procure o veterinário."],
+    alerta:"" },
+  { id:"calor", icone:"🌡️", titulo:"Superaquecimento (insolação)",
+    passos:["Leve o animal para um local fresco e à sombra.",
+            "Molhe o corpo com água em temperatura ambiente (nunca gelada).",
+            "Ofereça água fresca em pequena quantidade.",
+            "Procure o veterinário — insolação é uma emergência."],
+    alerta:"Água muito gelada pode causar choque térmico; use água natural." },
+];
+
+const telaEmergencia = document.getElementById("telaEmergencia");
+
+function wireVoltarEmg() {
+  const bv = document.getElementById("btVoltarEmg");
+  if (bv) bv.addEventListener("click", renderEmergenciaHome);
+}
+function wireAtalhos() {
+  ["btClinicas","btClinicas2","btClinicas3","btClinicas4"].forEach(id => {
+    const b = document.getElementById(id); if (b) b.addEventListener("click", renderClinicas);
+  });
+  ["btAcionarVet","btAcionarVet2"].forEach(id => {
+    const b = document.getElementById(id); if (b) b.addEventListener("click", renderSOS);
+  });
+}
+
+function renderEmergenciaHome() {
+  telaEmergencia.innerHTML =
+    '<div class="aviso">⚠️ As orientações abaixo são educativas e não substituem o atendimento veterinário. Em caso de emergência, procure um profissional.</div>' +
+    '<div class="sos-card"><h3>🚑 Emergência veterinária</h3>' +
+      '<p>Seu pet está passando mal? Acione o veterinário da família ou encontre a clínica mais próxima.</p>' +
+      '<button class="btn-sos" id="btAcionarVet">Acionar veterinário da família</button>' +
+      '<button class="btn-sec" id="btClinicas">Ver clínicas próximas</button>' +
+    '</div>' +
+    '<h3 class="emg-h3">Primeiros socorros — o que fazer</h3>' +
+    '<div class="sit-lista">' +
+      primeirosSocorros.map(s => '<div class="sit-item" data-id="' + s.id + '"><span class="ic">' + s.icone + '</span><span class="nm">' + s.titulo + '</span></div>').join('') +
+    '</div>';
+  wireAtalhos();
+  telaEmergencia.querySelectorAll(".sit-item").forEach(el => el.addEventListener("click", () => renderSituacao(el.dataset.id)));
+}
+
+function renderSituacao(id) {
+  const s = primeirosSocorros.find(x => x.id === id);
+  telaEmergencia.innerHTML =
+    '<button class="voltar" id="btVoltarEmg">← Voltar</button>' +
+    '<h2 class="det-titulo">' + s.icone + ' ' + s.titulo + '</h2>' +
+    '<ol class="passos">' + s.passos.map(p => '<li>' + p + '</li>').join('') + '</ol>' +
+    (s.alerta ? '<div class="alerta-passo">⚠️ ' + s.alerta + '</div>' : '') +
+    '<button class="btn-sos" id="btAcionarVet2" style="margin-top:18px">Acionar veterinário da família</button>' +
+    '<button class="btn-sec" id="btClinicas2">Ver clínicas próximas</button>';
+  wireVoltarEmg(); wireAtalhos();
+}
+
+function renderSOS() {
+  telaEmergencia.innerHTML =
+    '<button class="voltar" id="btVoltarEmg">← Voltar</button>' +
+    '<h2 class="det-titulo">🚑 Acionar veterinário</h2>' +
+    '<p class="secao" style="margin:8px 0 0">Envie um alerta para <b>' + vetFamilia.nome + '</b> (' + vetFamilia.clinica + ') com as primeiras informações. Ela poderá ir até você.</p>' +
+    '<label class="rotulo">Nome do pet</label><input class="campo" id="fPet" placeholder="Ex.: Thor">' +
+    '<label class="rotulo">Espécie</label><select class="campo" id="fEspecie"><option>Cão</option><option>Gato</option><option>Outro</option></select>' +
+    '<label class="rotulo">Situação</label><select class="campo" id="fSituacao">' + primeirosSocorros.map(s => '<option>' + s.titulo + '</option>').join('') + '<option>Outra</option></select>' +
+    '<label class="rotulo">Observações</label><textarea class="campo" id="fObs" rows="3" placeholder="Descreva rapidamente o que está acontecendo"></textarea>' +
+    '<button class="btn-sos" id="btEnviar" style="margin-top:16px">Enviar alerta</button>' +
+    '<button class="btn-sec" id="btClinicas3">Prefiro levar — ver clínicas próximas</button>';
+  wireVoltarEmg(); wireAtalhos();
+  document.getElementById("btEnviar").addEventListener("click", enviarSOS);
+}
+
+function enviarSOS() {
+  const pet = (document.getElementById("fPet").value || "Seu pet");
+  const esp = document.getElementById("fEspecie").value;
+  const sit = document.getElementById("fSituacao").value;
+  const obs = (document.getElementById("fObs").value || "—");
+  const tempo = Math.round(10 + vetFamilia.distanciaKm * 4);
+  telaEmergencia.innerHTML =
+    '<div class="confirma"><div class="check">✅</div><h3>Alerta enviado</h3>' +
+      '<p class="secao" style="margin:0 auto;max-width:440px"><b>' + vetFamilia.nome + '</b> (' + vetFamilia.clinica + ') foi notificada e está a caminho.<br>Chegada estimada: ~' + tempo + ' min.</p></div>' +
+    '<div class="secao"><h3>Informações enviadas ao veterinário</h3>' +
+      '<table class="tabela"><tr><td class="rot">Pet</td><td>' + pet + ' (' + esp + ')</td></tr>' +
+      '<tr><td class="rot">Situação</td><td>' + sit + '</td></tr>' +
+      '<tr><td class="rot">Observações</td><td>' + obs + '</td></tr></table></div>' +
+    '<button class="btn-sec" id="btClinicas4">Caso não seja possível, ver clínicas próximas</button>' +
+    '<button class="btn-sec" id="btVoltarEmg">Voltar ao início</button>';
+  wireVoltarEmg(); wireAtalhos();
+}
+
+function renderClinicas() {
+  const ord = clinicas.slice().sort((a,b) => a.distanciaKm - b.distanciaKm);
+  telaEmergencia.innerHTML =
+    '<button class="voltar" id="btVoltarEmg">← Voltar</button>' +
+    '<h2 class="det-titulo">🏥 Clínicas mais próximas</h2>' +
+    '<p class="secao" style="margin:8px 0 14px">Ordenadas pela distância até você.</p>' +
+    ord.map(c => '<div class="clinica"><div class="cl-info">' +
+      '<span class="cl-nome">' + c.nome + (c.id === 1 ? ' · sua clínica' : '') + '</span>' +
+      '<small>📍 ' + c.endereco + ' — ' + num1(c.distanciaKm) + ' km</small>' +
+      '<small>📞 ' + c.telefone + '</small></div>' +
+      (c.aberto24h ? '<span class="tag24">24h</span>' : '') + '</div>').join('');
+  wireVoltarEmg();
+}
+
+/* ---- Navegação entre seções ---- */
+function irPara(secao) {
+  telaProduto.style.display = "none";
+  const bl = document.getElementById("navLoja"), be = document.getElementById("navEmg");
+  if (secao === "emergencia") {
+    telaLista.style.display = "none"; telaEmergencia.style.display = "block";
+    renderEmergenciaHome(); bl.classList.remove("ativo"); be.classList.add("ativo");
+  } else {
+    telaEmergencia.style.display = "none"; telaLista.style.display = "block";
+    be.classList.remove("ativo"); bl.classList.add("ativo");
+  }
+  window.scrollTo(0, 0);
+}
+document.getElementById("navLoja").addEventListener("click", () => irPara("loja"));
+document.getElementById("navEmg").addEventListener("click", () => irPara("emergencia"));
+
+render();
+</script>
+</body>
+</html>

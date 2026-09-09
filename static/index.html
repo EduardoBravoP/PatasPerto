@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PatasPerto — marketplace de produtos pet</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="header-linha">
+    <div>
+      <h1 id="logo">🐾 PatasPerto</h1>
+      <p>Produtos para o seu pet nas lojas mais perto de você</p>
+    </div>
+    <button id="btConta" class="conta" title="Minha conta">👤 <span id="contaNome">Perfil</span></button>
+  </div>
+</header>
+
+<nav class="secoes">
+  <button id="navLoja" class="ativo">🛒 Loja</button>
+  <button id="navRec">🤖 Recomendação</button>
+  <button id="navEmg">🚑 Emergência</button>
+</nav>
+
+<div id="telaLista">
+  <div class="barra">
+    <input id="campoBusca" type="text" placeholder="Buscar produto (ex.: ração, antipulgas, dental)" autocomplete="off">
+    <button id="botaoBusca">Buscar</button>
+  </div>
+  <div class="filtros">
+    <button class="chip ativo" data-ord="preco">↓ Menor preço</button>
+    <button class="chip" data-ord="perto">Mais perto</button>
+  </div>
+  <p class="info" id="info">Carregando ofertas…</p>
+  <div class="grade" id="grade"></div>
+</div>
+
+<div id="telaProduto"></div>
+<div id="telaEmergencia"></div>
+<div id="telaRecomendacao"></div>
+<div id="telaPerfil"></div>
+
+<div id="toast" class="toast oculto"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

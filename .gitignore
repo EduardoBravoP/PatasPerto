@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+banco/patasperto.db
+ml/dataset.csv
+ml/modelo.pkl
+ml/metricas.json
+.DS_Store

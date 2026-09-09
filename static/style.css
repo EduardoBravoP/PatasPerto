@@ -182,3 +182,30 @@ nav.secoes button.ativo { color: #1f6f5c; font-weight: bold; border-bottom-color
 
 /* ---- Toast ---- */
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1f2a37; color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.25); z-index: 50; max-width: 90vw; text-align: center; }
+
+/* ---- Mapa (Leaflet) ---- */
+#telaMapa { display: none; padding: 16px 18px 40px; max-width: 760px; margin: 0 auto; }
+.mapa { height: 360px; border-radius: 12px; border: 1px solid #e2e6ea; background: #e9eef2; margin-top: 12px; z-index: 0; }
+.mapa.compacto { height: 260px; }
+.mapa.sem-tiles { background: repeating-linear-gradient(0deg, #eef1f4 0 1px, transparent 1px 40px), repeating-linear-gradient(90deg, #eef1f4 0 1px, #f7f9fa 1px 40px); }
+.mapa.sem-tiles::after { content: "Sem internet: mapa esquemático (posições reais, sem ruas)"; position: absolute; left: 8px; bottom: 8px; z-index: 400; font-size: 11px; background: rgba(255,255,255,.9); padding: 4px 8px; border-radius: 6px; color: #5b6774; }
+.pin { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: #fff; border: 2px solid #1f6f5c; font-size: 17px; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+.pin.voce { border-color: #1c62c4; background: #e4eefb; }
+.pin.fechada { border-color: #c9d1da; opacity: .7; filter: grayscale(.6); }
+.pin.destaque { border-color: #d64545; transform: scale(1.15); }
+.leaflet-popup-content { font-size: 13px; line-height: 1.45; margin: 10px 12px; }
+.leaflet-popup-content b { font-size: 14px; }
+.leaflet-popup-content a { color: #1f6f5c; font-weight: bold; }
+.mapa-filtros { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.mapa-filtros > div { flex: 1; min-width: 140px; }
+.mapa-filtros .campo { margin-top: 4px; }
+.leg { display: flex; gap: 14px; font-size: 12px; color: #5b6774; margin-top: 8px; flex-wrap: wrap; }
+.leg span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; border: 2px solid; }
+.leg .l-voce::before { border-color: #1c62c4; background: #e4eefb; }
+.leg .l-aberta::before { border-color: #1f6f5c; background: #fff; }
+.leg .l-fechada::before { border-color: #c9d1da; background: #f4f6f8; }
+.clinica.sel { border-color: #1f6f5c; box-shadow: 0 0 0 2px #cfe3db; }
+.clinica.fechada-lin { opacity: .65; }
+.tagoff { font-size: 10px; font-weight: bold; background: #f0f2f4; color: #8a94a0; padding: 3px 7px; border-radius: 5px; }
+@media (max-width: 400px) { nav.secoes button { font-size: 12px; padding: 10px 4px; } }
+.leg .l-anel::before { border-color: #1c62c4; border-style: dashed; background: transparent; }

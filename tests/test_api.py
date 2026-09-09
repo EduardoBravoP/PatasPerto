@@ -57,3 +57,15 @@ def test_metricas(cliente):
     m = cliente.get("/api/modelo/metricas").get_json()
     assert m["acuracia"] > 0.85
     assert "situacao" in m["importancias"]
+
+
+def test_coordenadas_para_o_mapa(cliente):
+    tutor = cliente.get("/api/tutores/1").get_json()
+    assert tutor["lat"] and tutor["lon"]
+    clinicas = cliente.get("/api/clinicas").get_json()
+    assert all(c["lat"] and c["lon"] for c in clinicas)
+    # posição no mapa coerente com a distância exibida (erro < 50 m)
+    import math
+    for c in clinicas:
+        d = math.hypot((c["lat"] - tutor["lat"]) * 111.32, (c["lon"] - tutor["lon"]) * 111.32 * math.cos(math.radians(tutor["lat"])))
+        assert abs(d - c["distancia_km"]) < 0.05

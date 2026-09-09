@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PatasPerto — marketplace de produtos pet</title>
+<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -20,6 +21,7 @@
 <nav class="secoes">
   <button id="navLoja" class="ativo">🛒 Loja</button>
   <button id="navRec">🤖 Recomendação</button>
+  <button id="navMapa">🗺️ Mapa</button>
   <button id="navEmg">🚑 Emergência</button>
 </nav>
 
@@ -40,9 +42,11 @@
 <div id="telaEmergencia"></div>
 <div id="telaRecomendacao"></div>
 <div id="telaPerfil"></div>
+<div id="telaMapa"></div>
 
 <div id="toast" class="toast oculto"></div>
 
+<script src="/static/vendor/leaflet/leaflet.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

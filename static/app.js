@@ -54,7 +54,7 @@ let metricasModelo = null;
 /* ---- Utilidades ---- */
 const $ = id => document.getElementById(id);
 const grade = $("grade"), info = $("info"), campo = $("campoBusca");
-const telas = { lista: $("telaLista"), produto: $("telaProduto"), emergencia: $("telaEmergencia"), recomendacao: $("telaRecomendacao"), perfil: $("telaPerfil") };
+const telas = { lista: $("telaLista"), produto: $("telaProduto"), emergencia: $("telaEmergencia"), recomendacao: $("telaRecomendacao"), perfil: $("telaPerfil"), mapa: $("telaMapa") };
 let termoAtual = "", ordemAtual = "preco";
 
 const fmt = v => "R$ " + v.toFixed(2).replace(".", ",");
@@ -95,6 +95,7 @@ async function carregarDados() {
     grade.innerHTML = '<div class="aviso-erro" style="grid-column:1/-1">' + MSG_SEM_API + '</div>';
   }
   api("/api/modelo/metricas").then(m => { metricasModelo = m; }).catch(() => {});
+  posicaoTutor().catch(() => {});
 }
 
 /* ---- Lista / grade ---- */
@@ -271,6 +272,7 @@ async function pedirRecomendacao() {
   try {
     const r = await api("/api/recomendar", { method: "POST", body: JSON.stringify(corpo) });
     res.innerHTML = htmlIA(r.ia, corpo) + htmlClinicas(r.banco) + htmlRodapeModelo();
+    if (r.banco.clinicas.length) montarMapa($("mapaRec"), r.banco.clinicas, { compacto: true });
   } catch (e) {
     res.innerHTML = '<div class="aviso-erro">' + (e.message.startsWith("HTTP") || e.message.includes("fetch") ? MSG_SEM_API : esc(e.message)) + '</div>';
   }
@@ -297,7 +299,8 @@ function htmlClinicas(b) {
     (c.aberto_24h ? '<span class="tag24">24h</span>' : '<span class="tag24">aberta</span>') + '</div>').join("") :
     '<p class="vazio-clin">Nenhuma clínica com essa especialidade aberta às ' + b.hora_consultada + '. Tente outro horário ou veja as clínicas de emergência 24h.</p>';
   return '<div class="bloco"><h3>Clínicas abertas às ' + b.hora_consultada + ' <span class="rot-db">consulta ao banco</span></h3>' +
-    '<p class="origem">filtro SQL: especialidade = ' + esc(b.especialidade_filtrada) + ' e horário dentro do funcionamento · ' + esc(b.origem) + '</p>' + lista + '</div>';
+    '<p class="origem">filtro SQL: especialidade = ' + esc(b.especialidade_filtrada) + ' e horário dentro do funcionamento · ' + esc(b.origem) + '</p>' +
+    (b.clinicas.length ? '<div id="mapaRec" class="mapa compacto"></div><p class="explica" style="margin-top:6px">📍 Toque em uma clínica no mapa para ver telefone, horário e a rota.</p>' : '') + lista + '</div>';
 }
 
 function htmlRodapeModelo() {
@@ -381,17 +384,103 @@ function enviarSOS() {
 async function renderClinicasEmergencia() {
   const hora = horaAgora();
   tEmg.innerHTML = '<button class="voltar" id="btVoltarEmg">← Voltar</button><h2 class="det-titulo">🏥 Clínicas de emergência abertas agora <span class="rot-db">consulta ao banco</span></h2>' +
-    '<p class="secao" style="margin:8px 0 14px">Filtro: especialidade “emergencia”, abertas às ' + hora + ', ordenadas pela distância.</p><div id="listaClin"><p class="vazio-clin">Carregando…</p></div>';
+    '<p class="secao" style="margin:8px 0 14px">Filtro: especialidade “emergencia”, abertas às ' + hora + ', ordenadas pela distância.</p><div id="mapaEmg" class="mapa compacto"></div><div id="listaClin" style="margin-top:12px"><p class="vazio-clin">Carregando…</p></div>';
   wireEmg();
   try {
     const cl = await api("/api/clinicas?especialidade=emergencia&hora=" + hora);
+    montarMapa($("mapaEmg"), cl, { compacto: true });
     $("listaClin").innerHTML = cl.map(c => '<div class="clinica"><div class="cl-info"><span class="cl-nome">' + esc(c.nome) + (c.id === 1 ? ' · sua clínica' : '') + '</span>' +
       '<small>📍 ' + esc(c.endereco) + ' — ' + num1(c.distancia_km) + ' km</small><small>📞 ' + esc(c.telefone) + '</small></div>' + (c.aberto_24h ? '<span class="tag24">24h</span>' : '<span class="tag24">aberta</span>') + '</div>').join('');
   } catch { $("listaClin").innerHTML = '<div class="aviso-erro">' + MSG_SEM_API + '</div>'; }
 }
 
+/* ================= MAPA (Leaflet + OpenStreetMap) ================= */
+/* As coordenadas vêm do banco (tabelas clinicas e tutores). O mapa é visualização:
+   o filtro "quem está aberta / qual especialidade" continua sendo consulta SQL. */
+let tutorPos = null;
+async function posicaoTutor() {
+  if (!tutorPos) { const t = await api("/api/tutores/" + TUTOR_ID); tutorPos = { lat: t.lat, lon: t.lon, nome: t.nome }; }
+  return tutorPos;
+}
+const pin = (emoji, classe) => L.divIcon({ className: "pin " + (classe || ""), html: emoji, iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -18] });
+const linkRota = c => tutorPos ? '<a href="https://www.google.com/maps/dir/?api=1&origin=' + tutorPos.lat + ',' + tutorPos.lon + '&destination=' + c.lat + ',' + c.lon + '&travelmode=driving" target="_blank" rel="noopener">🚗 Como chegar</a>' : '';
+
+function popupClinica(c) {
+  const aberta = c.aberta_agora === undefined ? null : c.aberta_agora;
+  return '<b>' + esc(c.nome) + '</b><br>📍 ' + esc(c.endereco) + ' — <b>' + num1(c.distancia_km) + ' km</b><br>📞 ' + esc(c.telefone) +
+    '<br>🕒 ' + (c.aberto_24h ? 'aberta 24h' : c.abre + '–' + c.fecha) + (aberta === null ? '' : aberta ? ' · <span style="color:#12805c">aberta agora</span>' : ' · <span style="color:#b23636">fechada agora</span>') +
+    '<br>🩺 ' + c.especialidades.map(e => esc(e.replace("_", " "))).join(", ") + '<br>' + linkRota(c);
+}
+
+function montarMapa(el, clinicas, opcoes = {}) {
+  if (!el || typeof L === "undefined") return null;
+  if (el._mapa) { el._mapa.remove(); el._mapa = null; }
+  el.classList.remove("sem-tiles");
+  const m = L.map(el, { scrollWheelZoom: false });
+  el._mapa = m; el._marcadores = {};
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' })
+    .on("tileerror", () => el.classList.add("sem-tiles")).addTo(m);
+  const pontos = [];
+  if (tutorPos) {
+    const p = [tutorPos.lat, tutorPos.lon]; pontos.push(p);
+    L.marker(p, { icon: pin("📍", "voce"), zIndexOffset: 1000 }).addTo(m).bindPopup("<b>Você está aqui</b><br>" + esc(lerPerfil().endereco));
+    [1, 2].forEach(km => L.circle(p, { radius: km * 1000, color: "#1c62c4", weight: 2, dashArray: "6 6", fill: false, opacity: .75 }).addTo(m));
+  }
+  clinicas.forEach(c => {
+    const p = [c.lat, c.lon]; pontos.push(p);
+    const fechada = c.aberta_agora === false;
+    const mk = L.marker(p, { icon: pin("🏥", (fechada ? "fechada" : "") + (c.id === opcoes.destaque ? " destaque" : "")) }).addTo(m).bindPopup(popupClinica(c));
+    el._marcadores[c.id] = mk;
+  });
+  if (pontos.length) m.fitBounds(pontos, { padding: [36, 36], maxZoom: 15 }); else m.setView([-22.8219, -47.2669], 14);
+  return m;
+}
+
+const ESPECIALIDADES_NOMES = { emergencia: "Emergência", dermatologia: "Dermatologia", odontologia: "Odontologia", ortopedia: "Ortopedia", nutricao: "Nutrição", clinico_geral: "Clínico geral" };
+
+function renderMapa() {
+  telas.mapa.innerHTML =
+    '<h2 class="det-titulo">🗺️ Clínicas perto de você <span class="rot-db">consulta ao banco</span></h2>' +
+    '<p class="secao" style="margin:6px 0 0">Posição das clínicas e do seu endereço. Os filtros abaixo são uma consulta ao banco (especialidade e horário de funcionamento) — o mapa só desenha o resultado.</p>' +
+    '<div class="bloco"><div class="mapa-filtros">' +
+      '<div><label class="rotulo" style="margin-top:0">Especialidade</label><select class="campo" id="mEsp"><option value="">Todas</option>' + Object.entries(ESPECIALIDADES_NOMES).map(([v, n]) => '<option value="' + v + '">' + n + '</option>').join("") + '</select></div>' +
+      '<div><label class="rotulo" style="margin-top:0">Horário</label><input class="campo" id="mHora" type="time" value="' + horaAgora() + '"></div>' +
+      '<div style="flex:0 0 auto"><label class="rotulo" style="margin-top:0">&nbsp;</label><label class="campo" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="mAbertas" checked> só abertas</label></div>' +
+    '</div>' +
+    '<div id="mapaGeral" class="mapa"></div>' +
+    '<div class="leg"><span class="l-voce">você</span><span class="l-aberta">clínica aberta</span><span class="l-fechada">clínica fechada</span><span class="l-anel">anéis de 1 km e 2 km</span></div></div>' +
+    '<div id="mapaLista" style="margin-top:14px"><p class="vazio-clin">Carregando…</p></div>';
+  ["mEsp", "mHora", "mAbertas"].forEach(id => $(id).addEventListener("change", atualizarMapa));
+  atualizarMapa();
+}
+
+async function atualizarMapa() {
+  const esp = $("mEsp").value, hora = $("mHora").value || horaAgora(), soAbertas = $("mAbertas").checked;
+  const lista = $("mapaLista");
+  try {
+    await posicaoTutor();
+    // Pede TODAS as clínicas da especialidade e marca abertas/fechadas no cliente para
+    // desenhar as duas no mapa; a regra de horário é a mesma da API (clinica_aberta).
+    const todas = await api("/api/clinicas" + (esp ? "?especialidade=" + esp : ""));
+    const abertas = new Set((await api("/api/clinicas?hora=" + hora + (esp ? "&especialidade=" + esp : ""))).map(c => c.id));
+    todas.forEach(c => { c.aberta_agora = abertas.has(c.id); });
+    const mostradas = soAbertas ? todas.filter(c => c.aberta_agora) : todas;
+    const mapa = montarMapa($("mapaGeral"), mostradas);
+    lista.innerHTML = '<p class="info" style="padding:0 0 8px">' + mostradas.length + ' clínica(s)' + (esp ? ' de ' + ESPECIALIDADES_NOMES[esp] : '') + (soAbertas ? ' abertas às ' + hora : '') + ', da mais perto para a mais longe</p>' +
+      (mostradas.length ? mostradas.map(c => '<div class="clinica' + (c.aberta_agora ? '' : ' fechada-lin') + '" data-id="' + c.id + '"><div class="cl-info"><span class="cl-nome">' + esc(c.nome) + '</span>' +
+        '<small>📍 ' + esc(c.endereco) + ' — <b>' + num1(c.distancia_km) + ' km</b></small><small>🩺 ' + c.especialidades.map(e => ESPECIALIDADES_NOMES[e] || e).join(", ") + ' · 🕒 ' + (c.aberto_24h ? '24h' : c.abre + '–' + c.fecha) + '</small></div>' +
+        (c.aberta_agora ? '<span class="tag24">' + (c.aberto_24h ? '24h' : 'aberta') + '</span>' : '<span class="tagoff">fechada</span>') + '</div>').join("") :
+        '<p class="vazio-clin">Nenhuma clínica com esse filtro. Desmarque "só abertas" ou mude o horário.</p>');
+    lista.querySelectorAll(".clinica").forEach(el => el.addEventListener("click", () => {
+      lista.querySelectorAll(".clinica").forEach(x => x.classList.remove("sel")); el.classList.add("sel");
+      const mk = $("mapaGeral")._marcadores[el.dataset.id];
+      if (mk && mapa) { mapa.setView(mk.getLatLng(), 16, { animate: true }); mk.openPopup(); $("mapaGeral").scrollIntoView({ behavior: "smooth", block: "center" }); }
+    }));
+  } catch (e) { lista.innerHTML = '<div class="aviso-erro">' + MSG_SEM_API + '</div>'; }
+}
+
 /* ---- Navegação ---- */
-const navs = { lista: $("navLoja"), recomendacao: $("navRec"), emergencia: $("navEmg") };
+const navs = { lista: $("navLoja"), recomendacao: $("navRec"), mapa: $("navMapa"), emergencia: $("navEmg") };
 function mostrar(nome) {
   Object.entries(telas).forEach(([k, el]) => { el.style.display = k === nome ? "block" : "none"; });
   Object.entries(navs).forEach(([k, el]) => el.classList.toggle("ativo", k === nome));
@@ -400,6 +489,7 @@ function mostrar(nome) {
 navs.lista.addEventListener("click", () => mostrar("lista"));
 navs.recomendacao.addEventListener("click", () => { mostrar("recomendacao"); renderRecomendacao("checkup"); });
 navs.emergencia.addEventListener("click", () => { mostrar("emergencia"); renderEmergenciaHome(); });
+navs.mapa.addEventListener("click", () => { mostrar("mapa"); renderMapa(); });
 $("btConta").addEventListener("click", () => { mostrar("perfil"); renderPerfil(); });
 $("logo").addEventListener("click", () => mostrar("lista"));
 $("botaoBusca").addEventListener("click", () => { termoAtual = campo.value; render(); });
@@ -410,3 +500,18 @@ document.querySelectorAll(".chip").forEach(chip => chip.addEventListener("click"
 
 atualizarConta();
 carregarDados();
+
+// Atalhos por URL para a apresentação: /#mapa, /#recomendacao, /#emergencia, /#perfil
+const abrirPorHash = () => {
+  const h = location.hash.replace("#", "");
+  if (h === "mapa") { mostrar("mapa"); renderMapa(); }
+  else if (h.startsWith("recomendacao")) {          // /#recomendacao ou /#recomendacao/convulsao (já dispara)
+    const sit = h.split("/")[1];
+    mostrar("recomendacao"); renderRecomendacao(sit || "checkup");
+    if (sit && NOME_SIT[sit]) pedirRecomendacao();
+  }
+  else if (h === "emergencia") { mostrar("emergencia"); renderEmergenciaHome(); }
+  else if (h === "perfil") { mostrar("perfil"); renderPerfil(); }
+};
+window.addEventListener("hashchange", abrirPorHash);
+abrirPorHash();

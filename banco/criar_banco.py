@@ -9,6 +9,7 @@ acadêmica). Os 6 primeiros produtos e as 5 lojas foram migrados do index.html
 original; os demais produtos foram acrescentados para dar sinal ao modelo de IA
 (grupo_ia: pele, bucal, articular...).
 """
+import math
 import os
 import random
 import sqlite3
@@ -18,13 +19,29 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 CAMINHO_DB = os.path.join(AQUI, "patasperto.db")
 CAMINHO_SCHEMA = os.path.join(AQUI, "schema.sql")
 
+# ------------------------------------------------------------ coordenadas
+# Cidade fictícia centrada na região de Sumaré-SP. O tutor demo fica no centro;
+# lojas e clínicas são posicionadas a `distancia_km` dele, em rumos variados,
+# para que a distância exibida no app e a posição no mapa sejam coerentes.
+CENTRO = (-22.8219, -47.2669)
+
+
+def coord(distancia_km, rumo_graus):
+    """Ponto a `distancia_km` do CENTRO no rumo dado (0° = norte, 90° = leste)."""
+    lat0, lon0 = CENTRO
+    dlat = distancia_km / 111.32 * math.cos(math.radians(rumo_graus))
+    dlon = distancia_km / (111.32 * math.cos(math.radians(lat0))) * math.sin(math.radians(rumo_graus))
+    return round(lat0 + dlat, 6), round(lon0 + dlon, 6)
+
+
 # ---------------------------------------------------------------- lojas
+# (id, nome, distancia_km, nota, qtd_avaliacoes, endereco, rumo_graus)
 LOJAS = [
-    (1, "Petshop do Zé",   0.8, 4.8, 120, "Rua das Acácias, 120 · Centro"),
-    (2, "Agropet Sumaré",  0.4, 4.6, 83,  "Av. Brasil, 455 · Jd. Bela Vista"),
-    (3, "Cantinho Animal", 1.2, 4.9, 210, "Rua Ipê, 78 · Vila Nova"),
-    (4, "Mundo Pet",       2.1, 4.7, 64,  "Av. da Saudade, 1020 · Jd. Europa"),
-    (5, "Casa dos Bichos", 1.7, 4.5, 96,  "Rua São João, 33 · Centro"),
+    (1, "Petshop do Zé",   0.8, 4.8, 120, "Rua das Acácias, 120 · Centro", 20),
+    (2, "Agropet Sumaré",  0.4, 4.6, 83,  "Av. Brasil, 455 · Jd. Bela Vista", 250),
+    (3, "Cantinho Animal", 1.2, 4.9, 210, "Rua Ipê, 78 · Vila Nova", 130),
+    (4, "Mundo Pet",       2.1, 4.7, 64,  "Av. da Saudade, 1020 · Jd. Europa", 75),
+    (5, "Casa dos Bichos", 1.7, 4.5, 96,  "Rua São João, 33 · Centro", 330),
 ]
 
 # ------------------------------------------------------------- produtos
@@ -109,28 +126,28 @@ OFERTAS = [
 ]
 
 # --------------------------------------------------------------- clínicas
-# (id, nome, endereco, distancia_km, telefone, abre, fecha, aberto_24h, [especialidades])
+# (id, nome, endereco, distancia_km, telefone, abre, fecha, aberto_24h, [especialidades], rumo_graus)
 CLINICAS = [
     (1, "Clínica VidaPet", "Rua das Flores, 200 · Centro", 0.6, "(19) 99999-0001", "00:00", "23:59", 1,
-     ["clinico_geral", "emergencia", "dermatologia", "nutricao"]),
+     ["clinico_geral", "emergencia", "dermatologia", "nutricao"], 300),
     (2, "Clínica AmorPet", "Av. Brasil, 455 · Jd. Bela Vista", 0.9, "(19) 99999-0002", "08:00", "18:00", 0,
-     ["clinico_geral", "odontologia", "dermatologia"]),
+     ["clinico_geral", "odontologia", "dermatologia"], 240),
     (3, "PetCare Emergências", "Av. Central, 890 · Jd. Europa", 1.5, "(19) 99999-0003", "00:00", "23:59", 1,
-     ["emergencia", "clinico_geral", "ortopedia"]),
+     ["emergencia", "clinico_geral", "ortopedia"], 60),
     (4, "Hosp. Vet. Bicho Feliz", "Rua Verde, 45 · Vila Nova", 2.3, "(19) 99999-0004", "00:00", "23:59", 1,
-     ["emergencia", "ortopedia", "odontologia", "clinico_geral"]),
+     ["emergencia", "ortopedia", "odontologia", "clinico_geral"], 150),
     (5, "OdontoPet Sorriso Animal", "Rua Ipê, 130 · Vila Nova", 1.3, "(19) 99999-0005", "09:00", "19:00", 0,
-     ["odontologia"]),
+     ["odontologia"], 115),
     (6, "NutriPet Consultório", "Av. da Saudade, 900 · Jd. Europa", 2.0, "(19) 99999-0006", "10:00", "20:00", 0,
-     ["nutricao", "clinico_geral"]),
+     ["nutricao", "clinico_geral"], 90),
     (7, "DermaVet Pele & Pelo", "Rua São João, 80 · Centro", 1.1, "(19) 99999-0007", "08:30", "17:30", 0,
-     ["dermatologia"]),
+     ["dermatologia"], 10),
     (8, "Plantão Vet Noturno", "Av. Brasil, 1200 · Jd. Bela Vista", 1.8, "(19) 99999-0008", "19:00", "07:00", 0,
-     ["emergencia", "clinico_geral"]),
+     ["emergencia", "clinico_geral"], 205),
 ]
 
 # ------------------------------------------------------------ tutor demo
-TUTOR_DEMO = (1, "Ana Ribeiro", "ana.ribeiro@exemplo.com", "(19) 98888-0000", "Rua das Acácias, 300 · Centro")
+TUTOR_DEMO = (1, "Ana Ribeiro", "ana.ribeiro@exemplo.com", "(19) 98888-0000", "Rua das Acácias, 300 · Centro", *CENTRO)
 PET_DEMO = (1, 1, "Thor", "cao", 6.0, "medio")
 # Histórico de compras do tutor demo nos últimos 90 dias (oferta_id, dias_atras)
 COMPRAS_DEMO = [
@@ -149,7 +166,8 @@ def criar():
     with open(CAMINHO_SCHEMA, encoding="utf-8") as f:
         con.executescript(f.read())
 
-    con.executemany("INSERT INTO lojas VALUES (?,?,?,?,?,?)", LOJAS)
+    con.executemany("INSERT INTO lojas VALUES (?,?,?,?,?,?,?,?)",
+                    [(*l[:6], *coord(l[2], l[6])) for l in LOJAS])
 
     for pid, nome, cat, grupo, img, desc, caracs, avals in PRODUTOS:
         con.execute("INSERT INTO produtos VALUES (?,?,?,?,?,?)", (pid, nome, cat, grupo, img, desc))
@@ -159,11 +177,13 @@ def criar():
     con.executemany("INSERT INTO ofertas (id, produto_id, loja_id, preco, entrega) VALUES (?,?,?,?,?)",
                     [(i + 1, *o) for i, o in enumerate(OFERTAS)])
 
-    for cid, nome, end, dist, tel, abre, fecha, h24, esps in CLINICAS:
-        con.execute("INSERT INTO clinicas VALUES (?,?,?,?,?,?,?,?)", (cid, nome, end, dist, tel, abre, fecha, h24))
+    for cid, nome, end, dist, tel, abre, fecha, h24, esps, rumo in CLINICAS:
+        lat, lon = coord(dist, rumo)
+        con.execute("INSERT INTO clinicas VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (cid, nome, end, dist, tel, abre, fecha, h24, lat, lon))
         con.executemany("INSERT INTO clinica_especialidades VALUES (?,?)", [(cid, e) for e in esps])
 
-    con.execute("INSERT INTO tutores VALUES (?,?,?,?,?)", TUTOR_DEMO)
+    con.execute("INSERT INTO tutores VALUES (?,?,?,?,?,?,?)", TUTOR_DEMO)
     con.execute("INSERT INTO pets VALUES (?,?,?,?,?,?)", PET_DEMO)
 
     hoje = date.today()

@@ -17,6 +17,7 @@ A loja não é enfeite: é a **fonte de dados da IA**. Cada compra registrada no
 | "Que especialidade meu pet precisa?" | **IA** — Random Forest treinado com dados sintéticos | `ml/treinar_modelo.py`, `ml/recomendador.py` |
 | "Quais clínicas dessa especialidade estão abertas às 23h?" | **Banco** — filtro SQL por especialidade e horário | `banco/consultas.py → listar_clinicas` |
 | "Quanto esse tutor gasta por mês em produtos de pele?" | **Banco** — agregação SQL das compras | `banco/consultas.py → historico_tutor` |
+| "Onde ficam essas clínicas no mapa?" | **Visualização** — Leaflet desenha as coordenadas que vieram do banco | `static/app.js → montarMapa` |
 
 A resposta da rota `/api/recomendar` e a tela do app separam explicitamente os dois blocos (`ia` e `banco`).
 
@@ -50,6 +51,7 @@ A resposta da rota `/api/recomendar` e a tela do app separam explicitamente os d
 | Camada | Tecnologia |
 |---|---|
 | Front-end | HTML, CSS, JavaScript puro; ilustrações em SVG inline |
+| Mapa | Leaflet 1.9 (servido localmente em `static/vendor/`) + tiles do OpenStreetMap |
 | Back-end / API | Python 3.12 + Flask |
 | Banco de dados | SQLite (módulo `sqlite3` da biblioteca padrão) |
 | Machine Learning | scikit-learn (Random Forest), pandas, numpy, joblib |
@@ -127,13 +129,21 @@ Por que Random Forest: lida com categóricas e numéricas juntas, é robusto a r
 |---|---|---|
 | `GET /` | estático | serve o app (`static/index.html`) |
 | `GET /api/ofertas` | banco | ofertas com produto, características, avaliações e loja |
-| `GET /api/clinicas?especialidade=&hora=HH:MM` | banco | clínicas filtradas por especialidade e "aberta no horário" (trata 24h e faixas noturnas) |
-| `GET /api/tutores/<id>` · `/historico` | banco | tutor + pet; features de compra dos últimos 90 dias |
+| `GET /api/clinicas?especialidade=&hora=HH:MM` | banco | clínicas (com lat/lon) filtradas por especialidade e "aberta no horário" (trata 24h e faixas noturnas) |
+| `GET /api/tutores/<id>` · `/historico` | banco | tutor + pet (com lat/lon, centro do mapa); features de compra dos últimos 90 dias |
 | `POST /api/compras` `{tutor_id, oferta_id}` | banco | registra a compra — o dado que alimenta a IA |
 | `POST /api/recomendar` `{tutor_id, especie, idade_anos, porte, situacao, hora}` | **IA + banco** | resposta com `ia` (especialidade, confiança, probabilidades, features usadas) e `banco` (clínicas abertas) |
 | `GET /api/modelo/metricas` | arquivo | conteúdo de `ml/metricas.json` |
 
 ---
+
+## 7b. Mapa interativo
+
+A aba **🗺️ Mapa** mostra o endereço do tutor (📍), anéis de 1 km e 2 km e as clínicas (🏥), com filtros de especialidade, horário e "só abertas". O mesmo mapa aparece embutido no resultado da Recomendação e na lista de clínicas da Emergência. Clicar num marcador abre a ficha (distância, telefone, horário, especialidades e link "Como chegar" no Google Maps).
+
+- As coordenadas são **fictícias** (região de Sumaré-SP) e geradas em `banco/criar_banco.py` a partir de `distancia_km` e um rumo, para que a distância exibida e a posição no mapa sejam coerentes (o teste `test_coordenadas_para_o_mapa` confere isso).
+- Leaflet é servido localmente; só os **tiles** (as ruas) vêm da internet. Sem internet o mapa vira um fundo quadriculado com os marcadores nas posições certas — a demo não quebra.
+- Atalhos por URL: `/#mapa`, `/#recomendacao`, `/#emergencia`, `/#perfil`; `/#recomendacao/convulsao` já abre a aba com a situação escolhida e dispara a recomendação (útil na apresentação).
 
 ## 8. Roteiro sugerido para a apresentação
 
@@ -144,7 +154,8 @@ Por que Random Forest: lida com categóricas e numéricas juntas, é robusto a r
    - Loja: buscar "antipulgas", ordenar por preço/distância, abrir o produto (dados vêm do SQLite).
    - Recomendação: pet cão, 6 anos, situação "check-up" → clínico geral (~70%).
    - Comprar 1× **Antipulgas** na Loja e pedir a recomendação de novo → **dermatologia (~85%)**. A compra mudou a IA.
-   - Trocar a situação para "convulsão" às 03:00 → emergência + só clínicas 24h/plantão (filtro do banco).
+   - Trocar a situação para "convulsão" às 03:00 → emergência + só clínicas 24h/plantão (filtro do banco), já desenhadas no mapa.
+   - Aba **Mapa** (`/#mapa`): filtrar por especialidade e horário, clicar numa clínica da lista para centralizar e abrir a ficha com telefone, horário e rota.
 5. **Decisões e limitações** — dados sintéticos declarados; ruído de 8%; horário fora do modelo; próximos passos (segmentação de clientes com KMeans para o público-alvo da clínica; persistir o perfil no banco).
 
 Cada integrante deve conseguir explicar: uma tabela do banco, uma coluna do dataset, uma métrica do treino e uma rota da API.
@@ -165,7 +176,8 @@ ml/treinar_modelo.py   treina e salva ml/modelo.pkl + ml/metricas.json
 ml/recomendador.py     carrega o modelo e faz a predição
 static/index.html      app (markup)
 static/style.css       estilos
-static/app.js          lógica do front-end (fetch na API)
+static/app.js          lógica do front-end (fetch na API, mapa Leaflet)
+static/vendor/leaflet  biblioteca de mapas servida localmente
 tests/test_api.py      smoke tests
 ```
 

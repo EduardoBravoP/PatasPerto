@@ -9,7 +9,9 @@ CREATE TABLE lojas (
   distancia_km   REAL NOT NULL,
   nota           REAL NOT NULL,
   qtd_avaliacoes INTEGER NOT NULL,
-  endereco       TEXT NOT NULL
+  endereco       TEXT NOT NULL,
+  lat            REAL NOT NULL,   -- coordenadas fictícias (região de Sumaré-SP)
+  lon            REAL NOT NULL
 );
 
 CREATE TABLE produtos (
@@ -50,7 +52,9 @@ CREATE TABLE clinicas (
   telefone     TEXT NOT NULL,
   abre         TEXT NOT NULL,   -- "HH:MM"
   fecha        TEXT NOT NULL,   -- "HH:MM"
-  aberto_24h   INTEGER NOT NULL DEFAULT 0
+  aberto_24h   INTEGER NOT NULL DEFAULT 0,
+  lat          REAL NOT NULL,     -- coordenadas fictícias, coerentes com distancia_km
+  lon          REAL NOT NULL
 );
 
 CREATE TABLE clinica_especialidades (
@@ -63,7 +67,9 @@ CREATE TABLE tutores (
   nome     TEXT NOT NULL,
   email    TEXT,
   telefone TEXT,
-  endereco TEXT
+  endereco TEXT,
+  lat      REAL,                  -- posição do tutor: centro do mapa e origem das distâncias
+  lon      REAL
 );
 
 CREATE TABLE pets (

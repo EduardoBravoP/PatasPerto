@@ -221,6 +221,7 @@ function renderPerfil() {
       '<div><label class="rotulo">Idade (anos)</label><input class="campo" id="pIdade" type="number" min="0" max="25" step="0.5" value="' + p.idade + '"></div>' +
       '<div><label class="rotulo">Porte</label><select class="campo" id="pPorte">' + opt("pequeno", p.porte, "Pequeno") + opt("medio", p.porte, "Médio") + opt("grande", p.porte, "Grande") + '</select></div></div>' +
       '<p class="explica">Espécie, idade e porte entram como variáveis do modelo de recomendação.</p></div>' +
+    htmlLocalizacao(renderPerfil) +
     '<div class="bloco" id="blocoHist"><h3>🛒 Histórico de compras <span class="rot-db">consulta ao banco</span></h3><p class="origem">últimos 90 dias · tabela compras do SQLite</p><p class="vazio-clin">Carregando…</p></div>' +
     '<button class="btn-prim" id="btSalvarPerfil">Salvar perfil</button>';
 
@@ -268,7 +269,8 @@ function renderRecomendacao(situacaoInicial) {
 async function pedirRecomendacao() {
   const bt = $("btRecomendar"), res = $("resRec");
   bt.disabled = true; bt.textContent = "Consultando o modelo…";
-  const corpo = { tutor_id: TUTOR_ID, especie: $("rEsp").value, idade_anos: parseFloat($("rIdade").value) || 0, porte: $("rPorte").value, situacao: $("rSit").value, hora: $("rHora").value || horaAgora() };
+  const corpo = { tutor_id: TUTOR_ID, especie: $("rEsp").value, idade_anos: parseFloat($("rIdade").value) || 0, porte: $("rPorte").value, situacao: $("rSit").value, hora: $("rHora").value || horaAgora(), ...corpoPos() };
+  await posicaoTutor().catch(() => {});
   try {
     const r = await api("/api/recomendar", { method: "POST", body: JSON.stringify(corpo) });
     res.innerHTML = htmlIA(r.ia, corpo) + htmlClinicas(r.banco) + htmlRodapeModelo();
@@ -295,11 +297,14 @@ function htmlIA(ia, corpo) {
 function htmlClinicas(b) {
   const lista = b.clinicas.length ? b.clinicas.map(c =>
     '<div class="clinica"><div class="cl-info"><span class="cl-nome">' + esc(c.nome) + '</span>' +
-    '<small>📍 ' + esc(c.endereco) + ' — ' + num1(c.distancia_km) + ' km</small><small>📞 ' + esc(c.telefone) + ' · ' + (c.aberto_24h ? 'aberta 24h' : c.abre + '–' + c.fecha) + '</small></div>' +
-    (c.aberto_24h ? '<span class="tag24">24h</span>' : '<span class="tag24">aberta</span>') + '</div>').join("") :
-    '<p class="vazio-clin">Nenhuma clínica com essa especialidade aberta às ' + b.hora_consultada + '. Tente outro horário ou veja as clínicas de emergência 24h.</p>';
-  return '<div class="bloco"><h3>Clínicas abertas às ' + b.hora_consultada + ' <span class="rot-db">consulta ao banco</span></h3>' +
-    '<p class="origem">filtro SQL: especialidade = ' + esc(b.especialidade_filtrada) + ' e horário dentro do funcionamento · ' + esc(b.origem) + '</p>' +
+    '<small>📍 ' + esc(c.endereco) + ' — ' + num1(c.distancia_km) + ' km</small><small>' + (c.telefone ? '📞 ' + esc(c.telefone) + ' · ' : '') + '🕒 ' + esc(txtHorario(c)) + '</small></div>' +
+    (c.aberta_agora === true ? '<span class="tag24">' + (c.aberto_24h ? '24h' : 'aberta') + '</span>' : '<span class="tagoff">horário ?</span>') + '</div>').join("") :
+    '<p class="vazio-clin">Nenhuma clínica encontrada para esse filtro às ' + b.hora_consultada + '. Tente outro horário, aumente o raio na aba Mapa ou veja as clínicas de emergência.</p>';
+  const fonte = b.fonte === "osm" ? '<span class="rot-ok">dados reais · OpenStreetMap</span>' : '<span class="rot-demo">dados de demonstração</span>';
+  return '<div class="bloco"><h3>Clínicas abertas às ' + b.hora_consultada + ' <span class="rot-db">consulta a dados</span> ' + fonte + '</h3>' +
+    '<p class="origem">filtro: especialidade = ' + esc(b.especialidade_filtrada) + ' e horário de funcionamento · ' + esc(b.origem) + '</p>' +
+    (b.aviso ? '<div class="aviso" style="margin-bottom:10px">' + esc(b.aviso) + '</div>' : '') +
+    (!temPosicaoReal() ? '<p class="explica" style="margin:0 0 10px">Para ver clínicas reais perto de você, defina sua localização na aba <b>🗺️ Mapa</b>.</p>' : '') +
     (b.clinicas.length ? '<div id="mapaRec" class="mapa compacto"></div><p class="explica" style="margin-top:6px">📍 Toque em uma clínica no mapa para ver telefone, horário e a rota.</p>' : '') + lista + '</div>';
 }
 
@@ -387,29 +392,89 @@ async function renderClinicasEmergencia() {
     '<p class="secao" style="margin:8px 0 14px">Filtro: especialidade “emergencia”, abertas às ' + hora + ', ordenadas pela distância.</p><div id="mapaEmg" class="mapa compacto"></div><div id="listaClin" style="margin-top:12px"><p class="vazio-clin">Carregando…</p></div>';
   wireEmg();
   try {
-    const cl = await api("/api/clinicas?especialidade=emergencia&hora=" + hora);
+    await posicaoTutor();
+    let r = await api("/api/clinicas?meta=1&especialidade=emergencia&hora=" + hora + "&so_abertas=1" + paramsPos());
+    if (r.meta.fonte === "osm" && !r.clinicas.length) r = await api("/api/clinicas?meta=1&hora=" + hora + "&so_abertas=1" + paramsPos());  // sem "emergência" no nome: mostra todas
+    const cl = r.clinicas;
     montarMapa($("mapaEmg"), cl, { compacto: true });
-    $("listaClin").innerHTML = cl.map(c => '<div class="clinica"><div class="cl-info"><span class="cl-nome">' + esc(c.nome) + (c.id === 1 ? ' · sua clínica' : '') + '</span>' +
-      '<small>📍 ' + esc(c.endereco) + ' — ' + num1(c.distancia_km) + ' km</small><small>📞 ' + esc(c.telefone) + '</small></div>' + (c.aberto_24h ? '<span class="tag24">24h</span>' : '<span class="tag24">aberta</span>') + '</div>').join('');
+    $("listaClin").innerHTML = (r.meta.aviso ? '<div class="aviso" style="margin-bottom:10px">' + esc(r.meta.aviso) + '</div>' : '') +
+      '<p class="origem">' + (r.meta.fonte === "osm" ? 'dados reais · OpenStreetMap · raio ' + r.meta.raio_km + ' km' : 'dados de demonstração — defina sua localização na aba Mapa') + '</p>' +
+      cl.map(c => '<div class="clinica"><div class="cl-info"><span class="cl-nome">' + esc(c.nome) + (c.fonte === "demo" && c.id === 1 ? ' · sua clínica' : '') + '</span>' +
+      '<small>📍 ' + esc(c.endereco) + ' — ' + num1(c.distancia_km) + ' km</small><small>' + (c.telefone ? '📞 <a href="tel:' + esc(c.telefone.replace(/\s/g, "")) + '">' + esc(c.telefone) + '</a> · ' : '') + '🕒 ' + esc(txtHorario(c)) + '</small></div>' +
+      (c.aberta_agora === true ? '<span class="tag24">' + (c.aberto_24h ? '24h' : 'aberta') + '</span>' : '<span class="tagoff">horário ?</span>') + '</div>').join('');
   } catch { $("listaClin").innerHTML = '<div class="aviso-erro">' + MSG_SEM_API + '</div>'; }
 }
 
 /* ================= MAPA (Leaflet + OpenStreetMap) ================= */
 /* As coordenadas vêm do banco (tabelas clinicas e tutores). O mapa é visualização:
    o filtro "quem está aberta / qual especialidade" continua sendo consulta SQL. */
-let tutorPos = null;
+/* Posição do usuário: GPS do navegador ou endereço geocodificado (Nominatim), guardada no
+   navegador. Com posição real, as clínicas vêm do OpenStreetMap; sem ela, dados de demonstração. */
+let tutorPos = null;            // posição em uso no mapa (real ou demo)
+let raioKm = 5;
+function lerPosicao() { try { return JSON.parse(localStorage.getItem("posicao") || "null"); } catch { return null; } }
+function salvarPosicao(p) { try { if (p) localStorage.setItem("posicao", JSON.stringify(p)); else localStorage.removeItem("posicao"); } catch {} tutorPos = p ? { ...p } : null; }
+const temPosicaoReal = () => !!lerPosicao();
+const paramsPos = () => { const p = lerPosicao(); return p ? "&lat=" + p.lat + "&lon=" + p.lon + "&raio_km=" + raioKm : ""; };
+const corpoPos = () => { const p = lerPosicao(); return p ? { lat: p.lat, lon: p.lon, raio_km: raioKm } : {}; };
+
 async function posicaoTutor() {
-  if (!tutorPos) { const t = await api("/api/tutores/" + TUTOR_ID); tutorPos = { lat: t.lat, lon: t.lon, nome: t.nome }; }
+  const real = lerPosicao();
+  if (real) { tutorPos = { ...real }; return tutorPos; }
+  if (!tutorPos) { const t = await api("/api/tutores/" + TUTOR_ID); tutorPos = { lat: t.lat, lon: t.lon, rotulo: t.endereco + " (demonstração)", fonte: "demo" }; }
   return tutorPos;
+}
+
+function usarGPS(aoTerminar) {
+  if (!navigator.geolocation) { toast("Seu navegador não oferece geolocalização. Digite um endereço."); return; }
+  toast("Obtendo sua localização…");
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const p = { lat: +pos.coords.latitude.toFixed(6), lon: +pos.coords.longitude.toFixed(6), fonte: "gps", rotulo: "Minha localização (GPS)", precisao_m: Math.round(pos.coords.accuracy) };
+    salvarPosicao(p); toast("📍 Localização obtida (precisão ~" + p.precisao_m + " m). Buscando clínicas reais…");
+    aoTerminar && aoTerminar();
+  }, err => {
+    toast(err.code === 1 ? "Permissão de localização negada. Digite um endereço abaixo." : "Não foi possível obter a localização (" + err.message + "). Digite um endereço.", 4500);
+  }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+}
+
+async function usarEndereco(q, aoTerminar) {
+  if (!q || q.trim().length < 3) { toast("Digite um endereço ou cidade."); return; }
+  try {
+    const r = await api("/api/geocodificar?q=" + encodeURIComponent(q.trim()));
+    salvarPosicao({ lat: r.lat, lon: r.lon, fonte: "endereco", rotulo: r.rotulo });
+    toast("📍 " + r.rotulo.split(",").slice(0, 3).join(","), 3500);
+    aoTerminar && aoTerminar();
+  } catch (e) { toast("Endereço não encontrado: " + e.message, 4000); }
+}
+
+function htmlLocalizacao(aoMudar) {
+  const p = lerPosicao();
+  const html = '<div class="bloco loc"><h3>📍 Sua localização ' + (p ? '<span class="rot-ok">real · ' + (p.fonte === "gps" ? "GPS" : "endereço") + '</span>' : '<span class="rot-demo">demonstração</span>') + '</h3>' +
+    '<p class="origem">' + (p ? esc(p.rotulo) + ' · ' + p.lat + ', ' + p.lon : 'Nenhuma localização definida: o mapa usa um endereço fictício em Sumaré-SP e clínicas de demonstração.') + '</p>' +
+    '<div class="mapa-filtros"><button class="btn-sec" id="btGPS">📡 Usar meu GPS</button>' +
+    '<div class="grupo-end"><input class="campo" id="inEnd" placeholder="ou digite endereço / cidade"><button class="btn-sec" id="btEnd">Definir</button></div>' +
+    (p ? '<button class="btn-sec" id="btLimparPos" title="Voltar aos dados de demonstração">✕</button>' : '') + '</div></div>';
+  setTimeout(() => {
+    const g = $("btGPS"), e = $("btEnd"), i = $("inEnd"), l = $("btLimparPos");
+    if (g) g.onclick = () => usarGPS(aoMudar);
+    if (e) e.onclick = () => usarEndereco(i.value, aoMudar);
+    if (i) i.onkeydown = ev => { if (ev.key === "Enter") usarEndereco(i.value, aoMudar); };
+    if (l) l.onclick = () => { salvarPosicao(null); tutorPos = null; toast("Voltando aos dados de demonstração."); aoMudar(); };
+  }, 0);
+  return html;
 }
 const pin = (emoji, classe) => L.divIcon({ className: "pin " + (classe || ""), html: emoji, iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -18] });
 const linkRota = c => tutorPos ? '<a href="https://www.google.com/maps/dir/?api=1&origin=' + tutorPos.lat + ',' + tutorPos.lon + '&destination=' + c.lat + ',' + c.lon + '&travelmode=driving" target="_blank" rel="noopener">🚗 Como chegar</a>' : '';
 
+const txtHorario = c => c.aberto_24h ? 'aberta 24h' : (c.horario_texto || (c.abre ? c.abre + '–' + c.fecha : 'horário não informado'));
+const txtAberta = c => c.aberta_agora === true ? ' · <span style="color:#12805c">aberta agora</span>' : c.aberta_agora === false ? ' · <span style="color:#b23636">fechada agora</span>' : '';
 function popupClinica(c) {
-  const aberta = c.aberta_agora === undefined ? null : c.aberta_agora;
-  return '<b>' + esc(c.nome) + '</b><br>📍 ' + esc(c.endereco) + ' — <b>' + num1(c.distancia_km) + ' km</b><br>📞 ' + esc(c.telefone) +
-    '<br>🕒 ' + (c.aberto_24h ? 'aberta 24h' : c.abre + '–' + c.fecha) + (aberta === null ? '' : aberta ? ' · <span style="color:#12805c">aberta agora</span>' : ' · <span style="color:#b23636">fechada agora</span>') +
-    '<br>🩺 ' + c.especialidades.map(e => esc(e.replace("_", " "))).join(", ") + '<br>' + linkRota(c);
+  return '<b>' + esc(c.nome) + '</b><br>📍 ' + esc(c.endereco) + ' — <b>' + num1(c.distancia_km) + ' km</b>' +
+    (c.telefone ? '<br>📞 <a href="tel:' + esc(c.telefone.replace(/\s/g, "")) + '">' + esc(c.telefone) + '</a>' : '') +
+    (c.site ? '<br>🌐 <a href="' + esc(c.site) + '" target="_blank" rel="noopener">site</a>' : '') +
+    '<br>🕒 ' + esc(txtHorario(c)) + txtAberta(c) +
+    '<br>🩺 ' + c.especialidades.map(e => ESPECIALIDADES_NOMES[e] || e).join(", ") + (c.especialidade_inferida ? ' <small>(inferida pelo nome)</small>' : '') +
+    '<br>' + linkRota(c) + (c.osm_url ? ' · <a href="' + esc(c.osm_url) + '" target="_blank" rel="noopener">ver no OSM</a>' : '');
 }
 
 function montarMapa(el, clinicas, opcoes = {}) {
@@ -423,12 +488,13 @@ function montarMapa(el, clinicas, opcoes = {}) {
   const pontos = [];
   if (tutorPos) {
     const p = [tutorPos.lat, tutorPos.lon]; pontos.push(p);
-    L.marker(p, { icon: pin("📍", "voce"), zIndexOffset: 1000 }).addTo(m).bindPopup("<b>Você está aqui</b><br>" + esc(lerPerfil().endereco));
+    L.marker(p, { icon: pin("📍", "voce"), zIndexOffset: 1000 }).addTo(m).bindPopup("<b>Você está aqui</b><br>" + esc(tutorPos.rotulo || lerPerfil().endereco));
     [1, 2].forEach(km => L.circle(p, { radius: km * 1000, color: "#1c62c4", weight: 2, dashArray: "6 6", fill: false, opacity: .75 }).addTo(m));
   }
   clinicas.forEach(c => {
     const p = [c.lat, c.lon]; pontos.push(p);
     const fechada = c.aberta_agora === false;
+    if (!c.lat || !c.lon) return;
     const mk = L.marker(p, { icon: pin("🏥", (fechada ? "fechada" : "") + (c.id === opcoes.destaque ? " destaque" : "")) }).addTo(m).bindPopup(popupClinica(c));
     el._marcadores[c.id] = mk;
   });
@@ -441,8 +507,10 @@ const ESPECIALIDADES_NOMES = { emergencia: "Emergência", dermatologia: "Dermato
 function renderMapa() {
   telas.mapa.innerHTML =
     '<h2 class="det-titulo">🗺️ Clínicas perto de você <span class="rot-db">consulta ao banco</span></h2>' +
-    '<p class="secao" style="margin:6px 0 0">Posição das clínicas e do seu endereço. Os filtros abaixo são uma consulta ao banco (especialidade e horário de funcionamento) — o mapa só desenha o resultado.</p>' +
+    '<p class="secao" style="margin:6px 0 0">Com a sua localização, as clínicas vêm do <b>OpenStreetMap</b> (dados reais, mantidos por voluntários). Os filtros são consulta a dados — o mapa só desenha o resultado.</p>' +
+    htmlLocalizacao(atualizarMapa) +
     '<div class="bloco"><div class="mapa-filtros">' +
+      '<div style="flex:0 0 110px"><label class="rotulo" style="margin-top:0">Raio</label><select class="campo" id="mRaio">' + [2, 5, 10, 20].map(r => '<option value="' + r + '"' + (r === raioKm ? ' selected' : '') + '>' + r + ' km</option>').join("") + '</select></div>' +
       '<div><label class="rotulo" style="margin-top:0">Especialidade</label><select class="campo" id="mEsp"><option value="">Todas</option>' + Object.entries(ESPECIALIDADES_NOMES).map(([v, n]) => '<option value="' + v + '">' + n + '</option>').join("") + '</select></div>' +
       '<div><label class="rotulo" style="margin-top:0">Horário</label><input class="campo" id="mHora" type="time" value="' + horaAgora() + '"></div>' +
       '<div style="flex:0 0 auto"><label class="rotulo" style="margin-top:0">&nbsp;</label><label class="campo" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="mAbertas" checked> só abertas</label></div>' +
@@ -451,25 +519,29 @@ function renderMapa() {
     '<div class="leg"><span class="l-voce">você</span><span class="l-aberta">clínica aberta</span><span class="l-fechada">clínica fechada</span><span class="l-anel">anéis de 1 km e 2 km</span></div></div>' +
     '<div id="mapaLista" style="margin-top:14px"><p class="vazio-clin">Carregando…</p></div>';
   ["mEsp", "mHora", "mAbertas"].forEach(id => $(id).addEventListener("change", atualizarMapa));
+  $("mRaio").addEventListener("change", () => { raioKm = +$("mRaio").value; atualizarMapa(); });
   atualizarMapa();
 }
 
 async function atualizarMapa() {
+  if (!$("mEsp")) return;
   const esp = $("mEsp").value, hora = $("mHora").value || horaAgora(), soAbertas = $("mAbertas").checked;
   const lista = $("mapaLista");
+  const blocoLoc = telas.mapa.querySelector(".bloco.loc"); if (blocoLoc) blocoLoc.outerHTML = htmlLocalizacao(atualizarMapa);
+  lista.innerHTML = '<p class="vazio-clin">Buscando clínicas' + (temPosicaoReal() ? ' reais no OpenStreetMap (raio ' + raioKm + ' km)' : '') + '…</p>';
   try {
     await posicaoTutor();
-    // Pede TODAS as clínicas da especialidade e marca abertas/fechadas no cliente para
-    // desenhar as duas no mapa; a regra de horário é a mesma da API (clinica_aberta).
-    const todas = await api("/api/clinicas" + (esp ? "?especialidade=" + esp : ""));
-    const abertas = new Set((await api("/api/clinicas?hora=" + hora + (esp ? "&especialidade=" + esp : ""))).map(c => c.id));
-    todas.forEach(c => { c.aberta_agora = abertas.has(c.id); });
-    const mostradas = soAbertas ? todas.filter(c => c.aberta_agora) : todas;
+    const r = await api("/api/clinicas?meta=1&hora=" + hora + (esp ? "&especialidade=" + esp : "") + paramsPos());
+    const todas = r.clinicas, meta = r.meta;
+    const mostradas = soAbertas ? todas.filter(c => c.aberta_agora !== false) : todas;
     const mapa = montarMapa($("mapaGeral"), mostradas);
-    lista.innerHTML = '<p class="info" style="padding:0 0 8px">' + mostradas.length + ' clínica(s)' + (esp ? ' de ' + ESPECIALIDADES_NOMES[esp] : '') + (soAbertas ? ' abertas às ' + hora : '') + ', da mais perto para a mais longe</p>' +
+    const fonte = meta.fonte === "osm" ? '<span class="rot-ok">dados reais · OpenStreetMap</span>' : '<span class="rot-demo">dados de demonstração</span>';
+    lista.innerHTML = (meta.aviso ? '<div class="aviso" style="margin-bottom:10px">' + esc(meta.aviso) + '</div>' : '') +
+      '<p class="info" style="padding:0 0 8px">' + mostradas.length + ' clínica(s)' + (esp ? ' de ' + ESPECIALIDADES_NOMES[esp] : '') + (soAbertas ? ' abertas (ou sem horário informado) às ' + hora : '') + (meta.fonte === "osm" ? ' num raio de ' + meta.raio_km + ' km' : '') + ', da mais perto para a mais longe · ' + fonte + '</p>' +
       (mostradas.length ? mostradas.map(c => '<div class="clinica' + (c.aberta_agora ? '' : ' fechada-lin') + '" data-id="' + c.id + '"><div class="cl-info"><span class="cl-nome">' + esc(c.nome) + '</span>' +
-        '<small>📍 ' + esc(c.endereco) + ' — <b>' + num1(c.distancia_km) + ' km</b></small><small>🩺 ' + c.especialidades.map(e => ESPECIALIDADES_NOMES[e] || e).join(", ") + ' · 🕒 ' + (c.aberto_24h ? '24h' : c.abre + '–' + c.fecha) + '</small></div>' +
-        (c.aberta_agora ? '<span class="tag24">' + (c.aberto_24h ? '24h' : 'aberta') + '</span>' : '<span class="tagoff">fechada</span>') + '</div>').join("") :
+        '<small>📍 ' + esc(c.endereco) + ' — <b>' + num1(c.distancia_km) + ' km</b>' + (c.telefone ? ' · 📞 ' + esc(c.telefone) : '') + '</small><small>🩺 ' + c.especialidades.map(e => ESPECIALIDADES_NOMES[e] || e).join(", ") + (c.especialidade_inferida ? '*' : '') + ' · 🕒 ' + esc(txtHorario(c)) + '</small></div>' +
+        (c.aberta_agora === true ? '<span class="tag24">' + (c.aberto_24h ? '24h' : 'aberta') + '</span>' : c.aberta_agora === false ? '<span class="tagoff">fechada</span>' : '<span class="tagoff">horário ?</span>') + '</div>').join("") +
+        (mostradas.some(c => c.especialidade_inferida) ? '<p class="explica">* Especialidade inferida pelo nome da clínica (o OpenStreetMap não registra especialidades). Confirme por telefone.</p>' : '') :
         '<p class="vazio-clin">Nenhuma clínica com esse filtro. Desmarque "só abertas" ou mude o horário.</p>');
     lista.querySelectorAll(".clinica").forEach(el => el.addEventListener("click", () => {
       lista.querySelectorAll(".clinica").forEach(x => x.classList.remove("sel")); el.classList.add("sel");
@@ -502,6 +574,13 @@ atualizarConta();
 carregarDados();
 
 // Atalhos por URL para a apresentação: /#mapa, /#recomendacao, /#emergencia, /#perfil
+// ?pos=lat,lon[,rótulo] define a localização sem GPS (ex.: /?pos=-22.9056,-47.0608,Campinas#mapa)
+(() => {
+  const q = new URLSearchParams(location.search).get("pos");
+  if (!q) return;
+  const [lat, lon, ...rot] = q.split(",");
+  if (isFinite(+lat) && isFinite(+lon)) salvarPosicao({ lat: +lat, lon: +lon, fonte: "endereco", rotulo: rot.join(",").trim() || ("Posição definida por URL (" + lat + ", " + lon + ")") });
+})();
 const abrirPorHash = () => {
   const h = location.hash.replace("#", "");
   if (h === "mapa") { mostrar("mapa"); renderMapa(); }

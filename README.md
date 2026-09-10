@@ -17,7 +17,8 @@ A loja não é enfeite: é a **fonte de dados da IA**. Cada compra registrada no
 | "Que especialidade meu pet precisa?" | **IA** — Random Forest treinado com dados sintéticos | `ml/treinar_modelo.py`, `ml/recomendador.py` |
 | "Quais clínicas dessa especialidade estão abertas às 23h?" | **Banco** — filtro SQL por especialidade e horário | `banco/consultas.py → listar_clinicas` |
 | "Quanto esse tutor gasta por mês em produtos de pele?" | **Banco** — agregação SQL das compras | `banco/consultas.py → historico_tutor` |
-| "Onde ficam essas clínicas no mapa?" | **Visualização** — Leaflet desenha as coordenadas que vieram do banco | `static/app.js → montarMapa` |
+| "Quais clínicas reais existem perto de mim?" | **Consulta a dados externos** — Overpass (OpenStreetMap) num raio, com cache no SQLite | `banco/clinicas_osm.py` |
+| "Onde ficam essas clínicas no mapa?" | **Visualização** — Leaflet desenha as coordenadas | `static/app.js → montarMapa` |
 
 A resposta da rota `/api/recomendar` e a tela do app separam explicitamente os dois blocos (`ia` e `banco`).
 
@@ -51,7 +52,7 @@ A resposta da rota `/api/recomendar` e a tela do app separam explicitamente os d
 | Camada | Tecnologia |
 |---|---|
 | Front-end | HTML, CSS, JavaScript puro; ilustrações em SVG inline |
-| Mapa | Leaflet 1.9 (servido localmente em `static/vendor/`) + tiles do OpenStreetMap |
+| Mapa e dados geográficos | Leaflet 1.9 (servido localmente) + tiles do OpenStreetMap; clínicas reais via **Overpass API** (OSM); geocodificação via **Nominatim**; localização via Geolocation API do navegador |
 | Back-end / API | Python 3.12 + Flask |
 | Banco de dados | SQLite (módulo `sqlite3` da biblioteca padrão) |
 | Machine Learning | scikit-learn (Random Forest), pandas, numpy, joblib |
@@ -129,21 +130,35 @@ Por que Random Forest: lida com categóricas e numéricas juntas, é robusto a r
 |---|---|---|
 | `GET /` | estático | serve o app (`static/index.html`) |
 | `GET /api/ofertas` | banco | ofertas com produto, características, avaliações e loja |
-| `GET /api/clinicas?especialidade=&hora=HH:MM` | banco | clínicas (com lat/lon) filtradas por especialidade e "aberta no horário" (trata 24h e faixas noturnas) |
+| `GET /api/clinicas?especialidade=&hora=HH:MM` | banco | clínicas de demonstração filtradas por especialidade e "aberta no horário" (trata 24h e faixas noturnas) |
+| `GET /api/clinicas?lat=&lon=&raio_km=5&hora=&so_abertas=1&meta=1` | dados externos | clínicas **reais** do OpenStreetMap ao redor da posição, com `aberta_agora` (True/False/None) e `meta` (fonte, raio, avisos) |
+| `GET /api/geocodificar?q=endereço` | dados externos | endereço/cidade → lat/lon/rótulo (Nominatim) |
 | `GET /api/tutores/<id>` · `/historico` | banco | tutor + pet (com lat/lon, centro do mapa); features de compra dos últimos 90 dias |
 | `POST /api/compras` `{tutor_id, oferta_id}` | banco | registra a compra — o dado que alimenta a IA |
-| `POST /api/recomendar` `{tutor_id, especie, idade_anos, porte, situacao, hora}` | **IA + banco** | resposta com `ia` (especialidade, confiança, probabilidades, features usadas) e `banco` (clínicas abertas) |
+| `POST /api/recomendar` `{tutor_id, especie, idade_anos, porte, situacao, hora, lat?, lon?, raio_km?}` | **IA + dados** | resposta com `ia` (especialidade, confiança, probabilidades, features usadas) e `banco` (clínicas abertas; reais se lat/lon vierem, com `fonte` e `aviso`) |
 | `GET /api/modelo/metricas` | arquivo | conteúdo de `ml/metricas.json` |
 
 ---
 
-## 7b. Mapa interativo
+## 7b. Mapa interativo com clínicas reais
 
-A aba **🗺️ Mapa** mostra o endereço do tutor (📍), anéis de 1 km e 2 km e as clínicas (🏥), com filtros de especialidade, horário e "só abertas". O mesmo mapa aparece embutido no resultado da Recomendação e na lista de clínicas da Emergência. Clicar num marcador abre a ficha (distância, telefone, horário, especialidades e link "Como chegar" no Google Maps).
+A aba **🗺️ Mapa** mostra a sua posição (📍), anéis de 1 km e 2 km e as clínicas veterinárias (🏥) num raio configurável (2 a 20 km), com filtros de especialidade, horário e "só abertas". O mesmo mapa aparece embutido no resultado da Recomendação e na lista da Emergência. Clicar num marcador abre a ficha: distância, telefone (clicável), site, horário, especialidades, "Como chegar" (Google Maps) e o link do ponto no OpenStreetMap.
 
-- As coordenadas são **fictícias** (região de Sumaré-SP) e geradas em `banco/criar_banco.py` a partir de `distancia_km` e um rumo, para que a distância exibida e a posição no mapa sejam coerentes (o teste `test_coordenadas_para_o_mapa` confere isso).
-- Leaflet é servido localmente; só os **tiles** (as ruas) vêm da internet. Sem internet o mapa vira um fundo quadriculado com os marcadores nas posições certas — a demo não quebra.
-- Atalhos por URL: `/#mapa`, `/#recomendacao`, `/#emergencia`, `/#perfil`; `/#recomendacao/convulsao` já abre a aba com a situação escolhida e dispara a recomendação (útil na apresentação).
+**Duas fontes de dados, sempre rotuladas na tela:**
+
+| Situação | Sua posição | Clínicas | Rótulo |
+|---|---|---|---|
+| Você definiu a localização (📡 GPS do navegador ou endereço digitado → Nominatim) | real | **reais**, do OpenStreetMap via Overpass API (`amenity=veterinary`), com cache de 24 h no SQLite | `dados reais · OpenStreetMap` |
+| Sem localização definida, ou sem internet | endereço fictício em Sumaré-SP | 8 clínicas fictícias da tabela `clinicas` | `dados de demonstração` |
+
+Limitações declaradas (e mostradas no app):
+- O OpenStreetMap **não registra especialidade**. Ela é **inferida pelo nome/horário** ("odonto" → odontologia, "hospital"/"24h" → emergência, etc.) e marcada com asterisco; sem correspondência, a recomendação mostra todas as clínicas próximas com um aviso. Confirme por telefone.
+- Muitas clínicas não têm horário no OSM → aparecem como "horário ?" e não são descartadas pelo filtro "só abertas".
+- A cobertura depende do que voluntários mapearam na sua região; o raio pode ser ampliado.
+- Leaflet é servido localmente; ruas, Overpass e Nominatim precisam de internet. Sem internet, o app cai automaticamente para os dados de demonstração e o mapa fica quadriculado.
+- Lojas e ofertas continuam fictícias (não há fonte pública de preços de petshops).
+
+Atalhos por URL: `/#mapa`, `/#recomendacao`, `/#emergencia`, `/#perfil`; `/#recomendacao/convulsao` já abre a aba com a situação escolhida e dispara a recomendação (útil na apresentação).
 
 ## 8. Roteiro sugerido para a apresentação
 
@@ -155,7 +170,7 @@ A aba **🗺️ Mapa** mostra o endereço do tutor (📍), anéis de 1 km e 2 km
    - Recomendação: pet cão, 6 anos, situação "check-up" → clínico geral (~70%).
    - Comprar 1× **Antipulgas** na Loja e pedir a recomendação de novo → **dermatologia (~85%)**. A compra mudou a IA.
    - Trocar a situação para "convulsão" às 03:00 → emergência + só clínicas 24h/plantão (filtro do banco), já desenhadas no mapa.
-   - Aba **Mapa** (`/#mapa`): filtrar por especialidade e horário, clicar numa clínica da lista para centralizar e abrir a ficha com telefone, horário e rota.
+   - Aba **Mapa** (`/#mapa`): clicar em "📡 Usar meu GPS" (ou digitar a cidade) → clínicas **reais** ao redor; filtrar por especialidade/horário/raio; clicar numa clínica para centralizar e abrir a ficha com telefone e rota.
 5. **Decisões e limitações** — dados sintéticos declarados; ruído de 8%; horário fora do modelo; próximos passos (segmentação de clientes com KMeans para o público-alvo da clínica; persistir o perfil no banco).
 
 Cada integrante deve conseguir explicar: uma tabela do banco, uma coluna do dataset, uma métrica do treino e uma rota da API.
@@ -171,6 +186,7 @@ requirements.txt
 banco/schema.sql       DDL do SQLite
 banco/criar_banco.py   cria e popula o banco (dados fictícios)
 banco/consultas.py     consultas SQL usadas pela API
+banco/clinicas_osm.py  clínicas reais (Overpass/OSM), geocodificação (Nominatim), cache
 ml/gerar_dataset.py    gera ml/dataset.csv
 ml/treinar_modelo.py   treina e salva ml/modelo.pkl + ml/metricas.json
 ml/recomendador.py     carrega o modelo e faz a predição

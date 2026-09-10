@@ -209,3 +209,11 @@ nav.secoes button.ativo { color: #1f6f5c; font-weight: bold; border-bottom-color
 .tagoff { font-size: 10px; font-weight: bold; background: #f0f2f4; color: #8a94a0; padding: 3px 7px; border-radius: 5px; }
 @media (max-width: 400px) { nav.secoes button { font-size: 12px; padding: 10px 4px; } }
 .leg .l-anel::before { border-color: #1c62c4; border-style: dashed; background: transparent; }
+.rot-ok { font-size: 10px; font-weight: bold; padding: 3px 8px; border-radius: 5px; background: #e3f5ec; color: #12805c; }
+.rot-demo { font-size: 10px; font-weight: bold; padding: 3px 8px; border-radius: 5px; background: #fff4e5; color: #8a5a12; }
+.bloco.loc .mapa-filtros { margin-top: 4px; }
+.bloco.loc .btn-sec { padding: 10px 12px; font-size: 13px; }
+.bloco.loc .mapa-filtros { align-items: stretch; }
+.bloco.loc .btn-sec { width: auto; margin-top: 0; white-space: nowrap; }
+.bloco.loc .campo { width: auto; flex: 1; min-width: 0; margin-top: 0; }
+.bloco.loc .grupo-end { display: flex; gap: 6px; flex: 1 1 260px; min-width: 0; }

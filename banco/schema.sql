@@ -91,3 +91,11 @@ CREATE TABLE compras (
   quantidade INTEGER NOT NULL DEFAULT 1,
   valor      REAL NOT NULL
 );
+
+-- Cache das consultas externas (Overpass/OpenStreetMap e Nominatim), com validade.
+-- Evita repetir chamadas de rede na apresentação e respeita os limites das APIs públicas.
+CREATE TABLE cache_externo (
+  chave     TEXT PRIMARY KEY,
+  conteudo  TEXT NOT NULL,     -- JSON
+  criado_em TEXT NOT NULL      -- ISO datetime
+);

@@ -69,6 +69,15 @@ bash preparar.sh          # cria .venv, banco, dataset, treina o modelo e sobe o
 # abra http://127.0.0.1:5000
 ```
 
+No Windows (PowerShell):
+
+```powershell
+git clone <url-do-repositorio>
+cd patas-perto
+.\preparar.ps1            # cria .venv, banco, dataset, treina o modelo e sobe o app
+# abra http://127.0.0.1:5000
+```
+
 Passo a passo equivalente (útil para demonstrar cada etapa na apresentação):
 
 ```bash
@@ -182,6 +191,7 @@ Cada integrante deve conseguir explicar: uma tabela do banco, uma coluna do data
 ```
 app.py                 API Flask (serve static/ e as rotas /api)
 preparar.sh            prepara tudo e sobe o app
+preparar.ps1           prepara tudo e sobe o app (Windows/PowerShell)
 requirements.txt
 banco/schema.sql       DDL do SQLite
 banco/criar_banco.py   cria e popula o banco (dados fictícios)
@@ -197,7 +207,7 @@ static/vendor/leaflet  biblioteca de mapas servida localmente
 tests/test_api.py      smoke tests
 ```
 
-Arquivos gerados (`patasperto.db`, `dataset.csv`, `modelo.pkl`, `metricas.json`) ficam fora do Git e são recriados por `preparar.sh`.
+Arquivos gerados (`patasperto.db`, `dataset.csv`, `modelo.pkl`, `metricas.json`) ficam fora do Git e são recriados por `preparar.sh` ou `preparar.ps1`.
 
 ---
 
